@@ -1,0 +1,10 @@
+{
+  "domain": "air_cloud",
+  "name": "AirCloud HA",
+  "documentation": "https://github.com/svmironov/air_cloud_ha",
+  "issue_tracker": "https://github.com/hcoohb/air_cloud_ha/issues",
+  "dependencies": [],
+  "codeowners": ["@svmironov"],
+  "requirements": [" websocket-client>=4.0.5"],
+  "version": "0.0.1"
+}
