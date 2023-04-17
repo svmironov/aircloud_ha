@@ -1,0 +1,19 @@
+author:
+  email: svmironov@users.noreply.github.com
+  homepage: https://github.com/svmironov/aircloud_ha
+  name: svmironov
+description: AirCloud climate component
+files:
+  - custom_components/aircloud_ha/__init__.py
+  - custom_components/aircloud_ha/climate.py
+  - custom_components/aircloud_ha/api.py
+  - custom_components/aircloud_ha/consts.py
+keywords:
+  - AirCloud
+  - Hitachi
+  - homeassistant
+  - home-assistant
+  - custom-component
+  - python
+license: MIT License
+name: aircloud_ha

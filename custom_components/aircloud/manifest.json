@@ -5,6 +5,6 @@
   "issue_tracker": "https://github.com/hcoohb/air_cloud_ha/issues",
   "dependencies": [],
   "codeowners": ["@svmironov"],
-  "requirements": [" websocket-client>=4.0.5"],
+  "requirements": ["websocket-client>=1.5.1"],
   "version": "0.0.1"
 }

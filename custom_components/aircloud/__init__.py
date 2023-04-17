@@ -7,15 +7,13 @@ from .api import AirCloudApi
 
 async def async_setup(hass: HomeAssistant, config: dict):
     conf = config.get(DOMAIN)
+    login = config[DOMAIN].get(CONF_EMAIL)
+    password = config[DOMAIN].get(CONF_PASSWORD)
 
     if conf:
-        hass.data[DOMAIN][API] = AirCloudApi(config[DOMAIN].get(CONF_EMAIL),  config[DOMAIN].get(CONF_PASSWORD))
+        hass.data[DOMAIN] = {}
+        hass.data[DOMAIN][API] = AirCloudApi(login, password)
 
-        hass.async_create_task(
-            hass.config_entries.flow.async_init(
-                DOMAIN, data=conf, context={"source": SOURCE_IMPORT}
-            )
-        )
     return True
 
 
