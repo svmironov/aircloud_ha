@@ -67,7 +67,7 @@ class AirCloudClimateEntity(ClimateEntity):
 
     @property
     def current_temperature(self):
-        return None
+        return self._room_temp
 
     @property
     def target_temperature(self):
@@ -198,7 +198,12 @@ class AirCloudClimateEntity(ClimateEntity):
         self.__execute_command()
 
     def update(self):
-        pass
+        devices =  self._api.load_climate_data
+        for device in devices:
+                if self._id == device["id"]:
+                        self.__update_data(device)
+                        
+                      
 
     def __execute_command(self):
         self._api.execute_command(self._id, self._power, self._target_temp, self._mode, self._fan_speed, self._fan_swing)
