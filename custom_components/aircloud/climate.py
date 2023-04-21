@@ -134,7 +134,7 @@ class AirCloudClimateEntity(ClimateEntity):
       
     @property
     def fan_modes(self):
-        return SUPPORT_FAN_MODE
+        return SUPPORT_FAN
     
     @property
     def swing_mode(self):
