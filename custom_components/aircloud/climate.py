@@ -54,7 +54,12 @@ class AirCloudClimateEntity(ClimateEntity):
         self._api = api
         self._id = device["id"]
         self._name = device["name"]
+        self._vendor_id = device["vendorThingId"]
         self.__update_data(device)
+
+    @property
+    def unique_id(self):
+         return self._vendor_id
 
     @property
     def supported_features(self):
