@@ -198,7 +198,7 @@ class AirCloudClimateEntity(ClimateEntity):
         self.__execute_command()
 
     def update(self):
-        devices =  self._api.load_climate_data
+        devices =  self._api.load_climate_data()
         for device in devices:
                 if self._id == device["id"]:
                         self.__update_data(device)
