@@ -55,6 +55,7 @@ class AirCloudClimateEntity(ClimateEntity):
         self._id = device["id"]
         self._name = device["name"]
         self._vendor_id = device["vendorThingId"]
+        self._update_lock = False
         self.__update_data(device)
 
     @property
@@ -150,6 +151,8 @@ class AirCloudClimateEntity(ClimateEntity):
         pass
         
     def set_hvac_mode(self, hvac_mode):
+        self._update_lock = True
+
         if hvac_mode != HVAC_MODE_OFF:
                 self._power = "ON"
 
@@ -174,6 +177,8 @@ class AirCloudClimateEntity(ClimateEntity):
         self.__execute_command()
 
     def set_fan_mode(self, fan_mode):
+        self._update_lock = True
+
         if fan_mode == FAN_AUTO:
                 self._fan_speed = "AUTO"
         elif fan_mode == FAN_LOW:
@@ -188,6 +193,8 @@ class AirCloudClimateEntity(ClimateEntity):
         self.__execute_command()
 
     def set_swing_mode(self, swing_mode):
+        self._update_lock = True
+        
         if swing_mode == SWING_VERTICAL:
                 self._power = "VERTICAL"
         else:
@@ -196,19 +203,22 @@ class AirCloudClimateEntity(ClimateEntity):
         self.__execute_command()
 
     def set_temperature(self, **kwargs):
+        self._update_lock = True
+
         target_temp = kwargs.get(ATTR_TEMPERATURE)
         if target_temp is None:
                 return
+        
         self._target_temp = target_temp
         self.__execute_command()
 
     def update(self):
-        devices =  self._api.load_climate_data()
-        for device in devices:
-                if self._id == device["id"]:
-                        self.__update_data(device)
-                        
-                      
+        if self._update_lock is False:
+                devices =  self._api.load_climate_data()
+                for device in devices:
+                        if self._id == device["id"]:
+                                self.__update_data(device)
+        self._update_lock = False
 
     def __execute_command(self):
         self._api.execute_command(self._id, self._power, self._target_temp, self._mode, self._fan_speed, self._fan_swing)

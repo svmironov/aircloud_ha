@@ -2,6 +2,7 @@ import requests
 import uuid
 import json
 
+from datetime import datetime
 from websocket import create_connection
 from .const import API_HOST, TOKEN_URN, WHO_URN, WSS_URL, CONTROL_URN
 
@@ -10,14 +11,23 @@ class AirCloudApi:
     def __init__(self, login, password):
         self._login = login
         self._password = password
+        self._last_token_update = datetime.now()
+        self._token = None
         self._family_id = None
 
     def __refresh_token(self):
-        authorization = {"email": self._login, "password": self._password}
-        response = requests.post(API_HOST + TOKEN_URN, json = authorization)
-        self._token = response.json()["token"]
-        if self._family_id is None:
-            self.__load_family_id()
+        now_datetime = datetime.now()
+        td = now_datetime - self._last_token_update
+        td_minutes = divmod(td.total_seconds(), 60)
+
+        if self._token is None or td_minutes[1] > 5:
+            authorization = {"email": self._login, "password": self._password}
+            response = requests.post(API_HOST + TOKEN_URN, json = authorization)
+            self._token = response.json()["token"]
+            if self._family_id is None:
+                self.__load_family_id()
+        
+            self._last_token_update = now_datetime
 
     def __load_family_id(self):
         response = requests.get(API_HOST + WHO_URN, headers =  self.__create_headers())
