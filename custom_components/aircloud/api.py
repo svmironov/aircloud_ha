@@ -12,8 +12,10 @@ class AirCloudApi:
         self._login = login
         self._password = password
         self._last_token_update = datetime.now()
+        self._last_data_update = datetime.now()
         self._token = None
         self._family_id = None
+        self._data = None
 
     def __refresh_token(self):
         now_datetime = datetime.now()
@@ -37,17 +39,20 @@ class AirCloudApi:
         self.__refresh_token()
         ws = create_connection("wss://notification-global-prod.aircloudhome.com/rac-notifications/websocket")
         ws.send("CONNECT\naccept-version:1.1,1.2\nheart-beat:10000,10000\nAuthorization:Bearer " + self._token + "\n\n\0\nSUBSCRIBE\nid:" + str(uuid.uuid4()) + "\ndestination:/notification/" + str(self._family_id) + "/" + str(self._family_id) + "\nack:auto\n\n\0")
-        ws.recv()
 
-        message = "{" + ws.recv().partition("{")[2].replace("\0", "")
+        response = None
+        while response is None or "{" not in response:
+            response = ws.recv()
         ws.close()
+
+        message = "{" + response.partition("{")[2].replace("\0", "")
         struct = json.loads(message)
-       
+
         return struct["data"]
     
-    def execute_command(self, id, power, iduTemperature, mode, fanSpeed, fanSwing):
+    def execute_command(self, id, power, idu_temperature, mode, fan_speed, fan_swing):
         self.__refresh_token()
-        command = {"id": id, "power": power, "iduTemperature": iduTemperature, "mode": mode, "fanSpeed": fanSpeed, "fanSwing": fanSwing}
+        command = {"id": id, "power": power, "iduTemperature": idu_temperature, "mode": mode, "fanSpeed": fan_speed, "fanSwing": fan_swing}
         requests.put(API_HOST + CONTROL_URN + "/" + str(id) + "?familyId=" + str(self._family_id), headers = self.__create_headers(), json = command)
      
     def __create_headers(self):
