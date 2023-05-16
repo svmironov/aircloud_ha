@@ -214,14 +214,14 @@ class AirCloudClimateEntity(ClimateEntity):
 
     def update(self):
         if self._update_lock is False:
-                devices =  self._api.load_climate_data()
+                devices = self._api.load_climate_data()
                 for device in devices:
                         if self._id == device["id"]:
                                 self.__update_data(device)
         self._update_lock = False
 
     def __execute_command(self):
-        self._api.execute_command(self._id, self._power, self._target_temp, self._mode, self._fan_speed, self._fan_swing)
+        self._api.execute_command(self._id, self._power, self._target_temp, self._mode, self._fan_speed, self._fan_swing, self._humidity)
 
     def __update_data(self, climate_data):
         self._power = climate_data["power"]
@@ -230,3 +230,9 @@ class AirCloudClimateEntity(ClimateEntity):
         self._room_temp = climate_data["roomTemperature"]
         self._fan_speed = climate_data["fanSpeed"]
         self._fan_swing = climate_data["fanSwing"]
+
+        self._humidity = 0
+        h = climate_data["humidity"]
+        if h <= 100:
+            self._humidity = h
+

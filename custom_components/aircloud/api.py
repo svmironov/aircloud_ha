@@ -1,10 +1,13 @@
 import requests
 import uuid
 import json
+import logging
 
 from datetime import datetime
 from websocket import create_connection
 from .const import API_HOST, TOKEN_URN, WHO_URN, WSS_URL, CONTROL_URN
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class AirCloudApi:
@@ -46,15 +49,18 @@ class AirCloudApi:
         ws.close()
 
         message = "{" + response.partition("{")[2].replace("\0", "")
+
+        _LOGGER.debug("AirCloud climate data: " + message)
         struct = json.loads(message)
 
         return struct["data"]
     
-    def execute_command(self, id, power, idu_temperature, mode, fan_speed, fan_swing):
+    def execute_command(self, id, power, idu_temperature, mode, fan_speed, fan_swing, humidity):
         self.__refresh_token()
-        command = {"id": id, "power": power, "iduTemperature": idu_temperature, "mode": mode, "fanSpeed": fan_speed, "fanSwing": fan_swing}
-        requests.put(API_HOST + CONTROL_URN + "/" + str(id) + "?familyId=" + str(self._family_id), headers = self.__create_headers(), json = command)
+        command = {"id": id, "power": power, "iduTemperature": idu_temperature, "mode": mode, "fanSpeed": fan_speed, "fanSwing": fan_swing, "humidity": humidity}
+        response = requests.put(API_HOST + CONTROL_URN + "/" + str(id) + "?familyId=" + str(self._family_id), headers = self.__create_headers(), json=command)
+        _LOGGER.debug("AirCloud command response: " + response)
      
     def __create_headers(self):
-       return {"Authorization" : "Bearer " + self._token}
+       return {"Authorization": "Bearer " + self._token}
     
