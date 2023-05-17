@@ -48,9 +48,8 @@ class AirCloudApi:
             response = ws.recv()
         ws.close()
 
+        _LOGGER.debug("AirCloud climate data: " + str(response))
         message = "{" + response.partition("{")[2].replace("\0", "")
-
-        _LOGGER.debug("AirCloud climate data: " + message)
         struct = json.loads(message)
 
         return struct["data"]
@@ -58,8 +57,8 @@ class AirCloudApi:
     def execute_command(self, id, power, idu_temperature, mode, fan_speed, fan_swing, humidity):
         self.__refresh_token()
         command = {"id": id, "power": power, "iduTemperature": idu_temperature, "mode": mode, "fanSpeed": fan_speed, "fanSwing": fan_swing, "humidity": humidity}
-        response = requests.put(API_HOST + CONTROL_URN + "/" + str(id) + "?familyId=" + str(self._family_id), headers = self.__create_headers(), json=command)
-        _LOGGER.debug("AirCloud command response: " + response)
+        response = requests.put(API_HOST + CONTROL_URN + "/" + str(id) + "?familyId=" + str(self._family_id), headers=self.__create_headers(), json=command)
+        _LOGGER.debug("AirCloud command response: " + str(response))
      
     def __create_headers(self):
        return {"Authorization": "Bearer " + self._token}
