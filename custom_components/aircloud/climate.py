@@ -233,6 +233,6 @@ class AirCloudClimateEntity(ClimateEntity):
 
         self._humidity = 0
         h = climate_data["humidity"]
-        if h <= 100:
+        if h < 2147483647:
             self._humidity = h
 
