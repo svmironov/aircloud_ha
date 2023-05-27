@@ -1,3 +1,4 @@
+import time
 from homeassistant.components.climate import ClimateEntity
 from homeassistant.components.climate.const import (FAN_AUTO, FAN_HIGH,
                                                     FAN_LOW, FAN_MEDIUM,
@@ -10,7 +11,8 @@ from homeassistant.components.climate.const import (FAN_AUTO, FAN_HIGH,
                                                     SUPPORT_FAN_MODE,
                                                     SUPPORT_SWING_MODE,
                                                     SUPPORT_TARGET_TEMPERATURE,
-                                                    SWING_OFF, SWING_VERTICAL)
+                                                    SWING_OFF, SWING_VERTICAL,
+                                                    SWING_HORIZONTAL, SWING_BOTH)
 from homeassistant.const import ATTR_TEMPERATURE, UnitOfTemperature
 
 from . import AirCloudApi, DOMAIN, API
@@ -24,6 +26,8 @@ SUPPORT_FAN = [
 SUPPORT_SWING = [
     SWING_OFF,
     SWING_VERTICAL,
+    SWING_HORIZONTAL,
+    SWING_BOTH
 ]
 SUPPORT_HVAC = [
     HVAC_MODE_OFF,
@@ -98,19 +102,19 @@ class AirCloudClimateEntity(ClimateEntity):
     @property
     def hvac_mode(self):
         if self._power == "OFF":
-                return HVAC_MODE_OFF
+            return HVAC_MODE_OFF
         elif self._mode == "COOLING":
-                return HVAC_MODE_COOL
+            return HVAC_MODE_COOL
         elif self._mode == "HEATING":
-                return HVAC_MODE_HEAT
+            return HVAC_MODE_HEAT
         elif self._mode == "FAN":
-                return HVAC_MODE_FAN_ONLY
+            return HVAC_MODE_FAN_ONLY
         elif self._mode == "DRY":
-                return HVAC_MODE_DRY
+            return HVAC_MODE_DRY
         elif self._mode == "AUTO":
-                return HVAC_MODE_AUTO
+            return HVAC_MODE_AUTO
         else:
-                return HVAC_MODE_OFF
+            return HVAC_MODE_OFF
 
     @property
     def hvac_modes(self):
@@ -119,19 +123,19 @@ class AirCloudClimateEntity(ClimateEntity):
     @property
     def fan_mode(self):
         if self._fan_speed == "AUTO":
-                return FAN_AUTO
+            return FAN_AUTO
         elif self._fan_speed == "LV1":
-                return FAN_LOW
+            return FAN_LOW
         elif self._fan_speed == "LV2":
-                return FAN_MEDIUM
+            return FAN_MEDIUM
         elif self._fan_speed == "LV3":
-                return FAN_MEDIUM
+            return FAN_MEDIUM
         elif self._fan_speed == "LV4":
-                return FAN_MEDIUM
+            return FAN_MEDIUM
         elif self._fan_speed == "LV5":
-                return FAN_HIGH
+            return FAN_HIGH
         else:
-                return FAN_AUTO
+            return FAN_AUTO
       
     @property
     def fan_modes(self):
@@ -140,8 +144,13 @@ class AirCloudClimateEntity(ClimateEntity):
     @property
     def swing_mode(self):
         if self._fan_swing == "VERTICAL":
-              return SWING_VERTICAL
-        return SWING_OFF
+            return SWING_VERTICAL
+        elif self._fan_swing == "HORIZONTAL":
+            return SWING_HORIZONTAL
+        elif self._fan_swing == "BOTH":
+            return SWING_VERTICAL
+        else:
+            return SWING_OFF
 
     @property
     def swing_modes(self):
@@ -154,22 +163,22 @@ class AirCloudClimateEntity(ClimateEntity):
         self._update_lock = True
 
         if hvac_mode != HVAC_MODE_OFF:
-                self._power = "ON"
+            self._power = "ON"
 
         if hvac_mode == HVAC_MODE_OFF:
-                self._power = "OFF"
+            self._power = "OFF"
         elif hvac_mode == HVAC_MODE_COOL:
-                self._mode = "COOLING"
+            self._mode = "COOLING"
         elif hvac_mode == HVAC_MODE_DRY:
-                self._mode = "DRY"
+            self._mode = "DRY"
         elif hvac_mode == HVAC_MODE_FAN_ONLY:
-                self._mode = "FAN"
+            self._mode = "FAN"
         elif hvac_mode == HVAC_MODE_AUTO:
-                self._mode = "AUTO"
+            self._mode = "AUTO"
         elif hvac_mode == HVAC_MODE_HEAT:
-                self._mode = "HEATING"
+            self._mode = "HEATING"
         else:
-                self._power = "OFF"
+            self._power = "OFF"
         
         self.__execute_command()
 
@@ -180,15 +189,15 @@ class AirCloudClimateEntity(ClimateEntity):
         self._update_lock = True
 
         if fan_mode == FAN_AUTO:
-                self._fan_speed = "AUTO"
+            self._fan_speed = "AUTO"
         elif fan_mode == FAN_LOW:
-                self._fan_speed = "LV1"
+            self._fan_speed = "LV1"
         elif fan_mode == FAN_MEDIUM:
-                self._fan_speed = "LV3"
+            self._fan_speed = "LV3"
         elif fan_mode == FAN_HIGH:
-                self._fan_speed = "LV5"
+            self._fan_speed = "LV5"
         else:
-                self._fan_speed = "AUTO"
+            self._fan_speed = "AUTO"
 
         self.__execute_command()
 
@@ -196,9 +205,13 @@ class AirCloudClimateEntity(ClimateEntity):
         self._update_lock = True
         
         if swing_mode == SWING_VERTICAL:
-                self._power = "VERTICAL"
+            self._fan_swing = "VERTICAL"
+        elif swing_mode == SWING_HORIZONTAL:
+            self._fan_swing = "HORIZONTAL"
+        elif swing_mode == SWING_BOTH:
+            self._fan_swing = "BOTH"
         else:
-                self._power = "OFF"
+            self._fan_swing = "OFF"
         
         self.__execute_command()
 
@@ -214,14 +227,16 @@ class AirCloudClimateEntity(ClimateEntity):
 
     def update(self):
         if self._update_lock is False:
-                devices = self._api.load_climate_data()
-                for device in devices:
-                        if self._id == device["id"]:
-                                self.__update_data(device)
-        self._update_lock = False
+            devices = self._api.load_climate_data()
+            for device in devices:
+                if self._id == device["id"]:
+                    self.__update_data(device)
 
     def __execute_command(self):
         self._api.execute_command(self._id, self._power, self._target_temp, self._mode, self._fan_speed, self._fan_swing, self._humidity)
+        time.sleep(5)
+        self._update_lock = False
+        self.update()
 
     def __update_data(self, climate_data):
         self._power = climate_data["power"]
