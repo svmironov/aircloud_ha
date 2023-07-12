@@ -2,6 +2,7 @@ import time
 from homeassistant.components.climate import ClimateEntity
 from homeassistant.components.climate.const import (FAN_AUTO, FAN_HIGH,
                                                     FAN_LOW, FAN_MEDIUM,
+                                                    FAN_MIDDLE,
                                                     HVAC_MODE_AUTO,
                                                     HVAC_MODE_COOL,
                                                     HVAC_MODE_DRY,
@@ -19,11 +20,10 @@ from . import AirCloudApi, DOMAIN, API
 
 SUPPORT_FAN = [
     FAN_AUTO,
-    '1',
-    '2',
-    '3',
-    '4',
-    '5'
+    FAN_LOW,
+    FAN_MEDIUM,
+    FAN_MIDDLE,
+    FAN_HIGH
 ]
 SUPPORT_SWING = [
     SWING_OFF,
@@ -127,15 +127,13 @@ class AirCloudClimateEntity(ClimateEntity):
         if self._fan_speed == "AUTO":
             return FAN_AUTO
         elif self._fan_speed == "LV1":
-            return '1'
+            return FAN_LOW
         elif self._fan_speed == "LV2":
-            return '2'
+            return FAN_MEDIUM
         elif self._fan_speed == "LV3":
-            return '3'
+            return FAN_MIDDLE
         elif self._fan_speed == "LV4":
-            return '4'
-        elif self._fan_speed == "LV5":
-            return '5'
+            return FAN_HIGH
         else:
             return FAN_AUTO
 
@@ -192,18 +190,14 @@ class AirCloudClimateEntity(ClimateEntity):
 
         if fan_mode == FAN_AUTO:
             self._fan_speed = "AUTO"
-        elif fan_mode == 'AUTO':
-            self._fan_speed = "AUTO"
-        elif fan_mode == '1':
+        elif fan_mode == FAN_LOW:
             self._fan_speed = "LV1"
-        elif fan_mode == '2':
+        elif fan_mode == FAN_MIDDLE:
             self._fan_speed = "LV2"
-        elif fan_mode == '3':
+        elif fan_mode == FAN_MEDIUM:
             self._fan_speed = "LV3"
-        elif fan_mode == '4':
+        elif fan_mode == FAN_HIGH:
             self._fan_speed = "LV4"
-        elif fan_mode == '5':
-            self._fan_speed = "LV5"
         else:
             self._fan_speed = "AUTO"
 
