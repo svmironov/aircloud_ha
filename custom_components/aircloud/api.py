@@ -5,7 +5,7 @@ import logging
 
 from datetime import datetime
 from websocket import create_connection
-from .const import API_HOST, TOKEN_URN, WHO_URN, WSS_URL, CONTROL_URN
+from .const import API_HOST, AUTH_URN, WHO_URN, WSS_URL, CONTROL_URN, REFRESH_TOKEN_URN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -19,20 +19,29 @@ class AirCloudApi:
         self._token = None
         self._family_id = None
         self._data = None
+        self._ref_token = None
+
+    def __authenticate(self):
+        authorization = {"email": self._login, "password": self._password}
+        self.__update_token_data(requests.post(API_HOST + AUTH_URN, json = authorization))
+        self._last_token_update = datetime.now()
+        if self._family_id is None:
+            self.__load_family_id()
 
     def __refresh_token(self):
         now_datetime = datetime.now()
         td = now_datetime - self._last_token_update
         td_minutes = divmod(td.total_seconds(), 60)
 
-        if self._token is None or td_minutes[1] > 5:
-            authorization = {"email": self._login, "password": self._password}
-            response = requests.post(API_HOST + TOKEN_URN, json = authorization)
-            self._token = response.json()["token"]
-            if self._family_id is None:
-                self.__load_family_id()
-        
+        if self._token is None:
+            self.__authenticate()
+        elif td_minutes[1] > 5:
+            self.__update_token_data(requests.post(API_HOST + REFRESH_TOKEN_URN, headers = {"Authorization": "Bearer " + self._ref_token, "isRefreshToken": "true"}))
             self._last_token_update = now_datetime
+
+    def __update_token_data(self, response):
+         self._token = response.json()["token"]
+         self._ref_token = response.json()["refreshToken"]
 
     def __load_family_id(self):
         response = requests.get(API_HOST + WHO_URN, headers =  self.__create_headers())
