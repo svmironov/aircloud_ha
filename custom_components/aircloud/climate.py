@@ -157,7 +157,8 @@ class AirCloudClimateEntity(ClimateEntity):
         return SUPPORT_SWING
 
     def turn_on(self):
-        pass
+        self._power = "ON"
+        self.__execute_command()
 
     def set_hvac_mode(self, hvac_mode):
         self._update_lock = True
