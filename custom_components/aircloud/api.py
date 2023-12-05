@@ -49,7 +49,7 @@ class AirCloudApi:
 
     def load_climate_data(self):
         self.__refresh_token()
-        ws = create_connection("wss://notification-global-prod.aircloudhome.com/rac-notifications/websocket")
+        ws = create_connection(WSS_URL)
         ws.send("CONNECT\naccept-version:1.1,1.2\nheart-beat:10000,10000\nAuthorization:Bearer " + self._token + "\n\n\0\nSUBSCRIBE\nid:" + str(uuid.uuid4()) + "\ndestination:/notification/" + str(self._family_id) + "/" + str(self._family_id) + "\nack:auto\n\n\0")
 
         response = None

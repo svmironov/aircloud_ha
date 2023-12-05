@@ -16,7 +16,7 @@ from homeassistant.components.climate.const import (FAN_AUTO, FAN_HIGH,
                                                     SWING_HORIZONTAL, SWING_BOTH)
 from homeassistant.const import ATTR_TEMPERATURE, UnitOfTemperature
 
-from . import AirCloudApi, DOMAIN, API
+from .const import DOMAIN, API, CONF_TEMP_ADJUST
 
 SUPPORT_FAN = [
     FAN_AUTO,
@@ -43,10 +43,10 @@ SUPPORT_HVAC = [
 
 async def _async_setup(hass, async_add):
     api = hass.data[DOMAIN][API]
-
+    temp_adjust = hass.data[DOMAIN][CONF_TEMP_ADJUST]
     devices = await hass.async_add_executor_job(api.load_climate_data)
     for device in devices:
-        async_add([AirCloudClimateEntity(api, device)], update_before_add=False)
+        async_add([AirCloudClimateEntity(api, device, temp_adjust)], update_before_add=False)
 
 async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
     await _async_setup(hass, async_add_entities)
@@ -56,8 +56,9 @@ async def async_setup_entry(hass, config_entry, async_add_devices):
 
 
 class AirCloudClimateEntity(ClimateEntity):
-    def __init__(self, api, device):
+    def __init__(self, api, device, temp_adjust):
         self._api = api
+        self._temp_adjust = temp_adjust
         self._id = device["id"]
         self._name = device["name"]
         self._vendor_id = device["vendorThingId"]
@@ -245,7 +246,11 @@ class AirCloudClimateEntity(ClimateEntity):
         self._power = climate_data["power"]
         self._mode = climate_data["mode"]
         self._target_temp = climate_data["iduTemperature"]
+
         self._room_temp = climate_data["roomTemperature"]
+        if self._temp_adjust is not None:
+            self._room_temp = self._room_temp + self._temp_adjust
+
         self._fan_speed = climate_data["fanSpeed"]
         self._fan_swing = climate_data["fanSwing"]
 
@@ -253,4 +258,3 @@ class AirCloudClimateEntity(ClimateEntity):
         h = climate_data["humidity"]
         if h < 2147483647:
             self._humidity = 50
-
