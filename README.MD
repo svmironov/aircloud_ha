@@ -22,6 +22,7 @@ First install HACS if you don't have it yet. Add https://github.com/svmironov/ai
     air_cloud:
         email: "login" #supported only email authorization
         password: "pass"
+        temp_adjust: -1 #optional parameter for adjustment current temp
 
     climate:
        - platform: air_cloud
