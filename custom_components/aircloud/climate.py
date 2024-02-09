@@ -3,18 +3,13 @@ from homeassistant.components.climate import ClimateEntity
 from homeassistant.components.climate.const import (FAN_AUTO, FAN_HIGH,
                                                     FAN_LOW, FAN_MEDIUM,
                                                     FAN_MIDDLE,
-                                                    HVAC_MODE_AUTO,
-                                                    HVAC_MODE_COOL,
-                                                    HVAC_MODE_DRY,
-                                                    HVAC_MODE_FAN_ONLY,
-                                                    HVAC_MODE_HEAT,
-                                                    HVAC_MODE_OFF,
                                                     SUPPORT_FAN_MODE,
                                                     SUPPORT_SWING_MODE,
                                                     SUPPORT_TARGET_TEMPERATURE,
                                                     SWING_OFF, SWING_VERTICAL,
                                                     SWING_HORIZONTAL, SWING_BOTH)
 from homeassistant.const import ATTR_TEMPERATURE, UnitOfTemperature
+from homeassistant.components.climate.const import HVACMode, ClimateEntityFeature
 
 from .const import DOMAIN, API, CONF_TEMP_ADJUST
 
@@ -32,12 +27,12 @@ SUPPORT_SWING = [
     SWING_BOTH
 ]
 SUPPORT_HVAC = [
-    HVAC_MODE_OFF,
-    HVAC_MODE_COOL,
-    HVAC_MODE_DRY,
-    HVAC_MODE_FAN_ONLY,
-    HVAC_MODE_AUTO,
-    HVAC_MODE_HEAT
+    HVACMode.OFF,
+    HVACMode.COOL,
+    HVACMode.DRY,
+    HVACMode.FAN_ONLY,
+    HVACMode.AUTO,
+    HVACMode.HEAT
 ]
 
 
@@ -71,7 +66,7 @@ class AirCloudClimateEntity(ClimateEntity):
 
     @property
     def supported_features(self):
-        support_flags = SUPPORT_TARGET_TEMPERATURE | SUPPORT_FAN_MODE | SUPPORT_SWING_MODE
+        support_flags = ClimateEntityFeature.TARGET_TEMPERATURE | ClimateEntityFeature.FAN_MODE | ClimateEntityFeature.SWING_MODE
         return support_flags
 
     @property
@@ -105,19 +100,19 @@ class AirCloudClimateEntity(ClimateEntity):
     @property
     def hvac_mode(self):
         if self._power == "OFF":
-            return HVAC_MODE_OFF
+            return HVACMode.OFF
         elif self._mode == "COOLING":
-            return HVAC_MODE_COOL
+            return HVACMode.COOL
         elif self._mode == "HEATING":
-            return HVAC_MODE_HEAT
+            return HVACMode.HEAT
         elif self._mode == "FAN":
-            return HVAC_MODE_FAN_ONLY
+            return HVACMode.FAN_ONLY
         elif self._mode == "DRY":
-            return HVAC_MODE_DRY
+            return HVACMode.DRY
         elif self._mode == "AUTO":
-            return HVAC_MODE_AUTO
+            return HVACMode.AUTO
         else:
-            return HVAC_MODE_OFF
+            return HVACMode.OFF
 
     @property
     def hvac_modes(self):
@@ -164,20 +159,20 @@ class AirCloudClimateEntity(ClimateEntity):
     def set_hvac_mode(self, hvac_mode):
         self._update_lock = True
 
-        if hvac_mode != HVAC_MODE_OFF:
+        if hvac_mode != HVACMode.OFF:
             self._power = "ON"
 
-        if hvac_mode == HVAC_MODE_OFF:
+        if hvac_mode == HVACMode.OFF:
             self._power = "OFF"
-        elif hvac_mode == HVAC_MODE_COOL:
+        elif hvac_mode == HVACMode.COOL:
             self._mode = "COOLING"
-        elif hvac_mode == HVAC_MODE_DRY:
+        elif hvac_mode == HVACMode.DRY:
             self._mode = "DRY"
-        elif hvac_mode == HVAC_MODE_FAN_ONLY:
+        elif hvac_mode == HVACMode.FAN_ONLY:
             self._mode = "FAN"
-        elif hvac_mode == HVAC_MODE_AUTO:
+        elif hvac_mode == HVACMode.AUTO:
             self._mode = "AUTO"
-        elif hvac_mode == HVAC_MODE_HEAT:
+        elif hvac_mode == HVACMode.HEAT:
             self._mode = "HEATING"
         else:
             self._power = "OFF"
