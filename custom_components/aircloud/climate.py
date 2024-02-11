@@ -1,13 +1,11 @@
-import time
+import asyncio
 from homeassistant.components.climate import ClimateEntity
 from homeassistant.components.climate.const import (FAN_AUTO, FAN_HIGH,
                                                     FAN_LOW, FAN_MEDIUM,
-                                                    FAN_MIDDLE,
-                                                    SUPPORT_FAN_MODE,
-                                                    SUPPORT_SWING_MODE,
-                                                    SUPPORT_TARGET_TEMPERATURE,
-                                                    SWING_OFF, SWING_VERTICAL,
-                                                    SWING_HORIZONTAL, SWING_BOTH)
+                                                    FAN_MIDDLE, SWING_OFF,
+                                                    SWING_VERTICAL,
+                                                    SWING_HORIZONTAL,
+                                                    SWING_BOTH)
 from homeassistant.const import ATTR_TEMPERATURE, UnitOfTemperature
 from homeassistant.components.climate.const import HVACMode, ClimateEntityFeature
 
@@ -39,18 +37,23 @@ SUPPORT_HVAC = [
 async def _async_setup(hass, async_add):
     api = hass.data[DOMAIN][API]
     temp_adjust = hass.data[DOMAIN][CONF_TEMP_ADJUST]
-    devices = await hass.async_add_executor_job(api.load_climate_data)
+    devices = await api.load_climate_data()
     for device in devices:
         async_add([AirCloudClimateEntity(api, device, temp_adjust)], update_before_add=False)
 
+
 async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
     await _async_setup(hass, async_add_entities)
+
 
 async def async_setup_entry(hass, config_entry, async_add_devices):
     await _async_setup(hass, async_add_devices)
 
 
 class AirCloudClimateEntity(ClimateEntity):
+    _enable_turn_on_off_backwards_compatibility = False
+    _attr_has_entity_name = True
+
     def __init__(self, api, device, temp_adjust):
         self._api = api
         self._temp_adjust = temp_adjust
@@ -61,12 +64,14 @@ class AirCloudClimateEntity(ClimateEntity):
         self.__update_data(device)
 
     @property
-    def unique_id(self):
-         return self._vendor_id
+    def extra_state_attributes(self):
+        return {"air_cloud_id": self._id}
 
     @property
     def supported_features(self):
-        support_flags = ClimateEntityFeature.TARGET_TEMPERATURE | ClimateEntityFeature.FAN_MODE | ClimateEntityFeature.SWING_MODE
+        support_flags = (ClimateEntityFeature.TARGET_TEMPERATURE | ClimateEntityFeature.FAN_MODE
+                         | ClimateEntityFeature.SWING_MODE | ClimateEntityFeature.TURN_ON
+                         | ClimateEntityFeature.TURN_OFF)
         return support_flags
 
     @property
@@ -153,10 +158,38 @@ class AirCloudClimateEntity(ClimateEntity):
         return SUPPORT_SWING
 
     def turn_on(self):
-        self._power = "ON"
-        self.__execute_command()
+        asyncio.run(self.async_turn_on())
+
+    def turn_off(self):
+        asyncio.run(self.async_turn_off())
 
     def set_hvac_mode(self, hvac_mode):
+        asyncio.run(self.async_set_hvac_mode(hvac_mode))
+
+    def set_preset_mode(self, preset_mode):
+        asyncio.run(self.async_set_preset_mode(preset_mode))
+
+    def set_fan_mode(self, fan_mode):
+        asyncio.run(self.async_set_fan_mode(fan_mode))
+
+    def set_swing_mode(self, swing_mode):
+        asyncio.run(self.async_set_swing_mode(swing_mode))
+
+    def set_temperature(self, **kwargs):
+        asyncio.run(self.async_set_temperature(**kwargs))
+
+    def update(self):
+        asyncio.run(self.async_update())
+
+    async def async_turn_on(self):
+        self._power = "ON"
+        await self.__execute_command()
+
+    async def async_turn_off(self):
+        self._power = "OFF"
+        await self.__execute_command()
+
+    async def async_set_hvac_mode(self, hvac_mode):
         self._update_lock = True
 
         if hvac_mode != HVACMode.OFF:
@@ -177,12 +210,12 @@ class AirCloudClimateEntity(ClimateEntity):
         else:
             self._power = "OFF"
 
-        self.__execute_command()
+        await self.__execute_command()
 
-    def set_preset_mode(self, preset_mode):
-        self.__execute_command()
+    async def async_set_preset_mode(self, preset_mode):
+        await self.__execute_command()
 
-    def set_fan_mode(self, fan_mode):
+    async def async_set_fan_mode(self, fan_mode):
         self._update_lock = True
 
         if fan_mode == FAN_AUTO:
@@ -198,11 +231,11 @@ class AirCloudClimateEntity(ClimateEntity):
         else:
             self._fan_speed = "AUTO"
 
-        self.__execute_command()
+        await self.__execute_command()
 
-    def set_swing_mode(self, swing_mode):
+    async def async_set_swing_mode(self, swing_mode):
         self._update_lock = True
-        
+
         if swing_mode == SWING_VERTICAL:
             self._fan_swing = "VERTICAL"
         elif swing_mode == SWING_HORIZONTAL:
@@ -211,31 +244,32 @@ class AirCloudClimateEntity(ClimateEntity):
             self._fan_swing = "BOTH"
         else:
             self._fan_swing = "OFF"
-        
-        self.__execute_command()
 
-    def set_temperature(self, **kwargs):
+        await self.__execute_command()
+
+    async def async_set_temperature(self, **kwargs):
         self._update_lock = True
 
         target_temp = kwargs.get(ATTR_TEMPERATURE)
         if target_temp is None:
-                return
-        
-        self._target_temp = target_temp
-        self.__execute_command()
+            return
 
-    def update(self):
+        self._target_temp = target_temp
+        await self.__execute_command()
+
+    async def async_update(self):
         if self._update_lock is False:
-            devices = self._api.load_climate_data()
+            devices = await self._api.load_climate_data()
             for device in devices:
                 if self._id == device["id"]:
                     self.__update_data(device)
 
-    def __execute_command(self):
-        self._api.execute_command(self._id, self._power, self._target_temp, self._mode, self._fan_speed, self._fan_swing, self._humidity)
-        time.sleep(5)
+    async def __execute_command(self):
+        await self._api.execute_command(self._id, self._power, self._target_temp, self._mode, self._fan_speed,
+                                        self._fan_swing, self._humidity)
+        await asyncio.sleep(5)
         self._update_lock = False
-        self.update()
+        await self.async_update()
 
     def __update_data(self, climate_data):
         self._power = climate_data["power"]

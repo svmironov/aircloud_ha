@@ -6,14 +6,35 @@ from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
 
 DOMAIN = "air_cloud"
 API = "api"
+PLATFORM_NAME = "climate"
 CONF_TEMP_ADJUST = "temp_adjust"
-PLATFORM_CLIMATE = "climate"
-API_HOST = "https://api-global-prod.aircloudhome.com/"
-AUTH_URN = "iam/auth/sign-in"
-REFRESH_TOKEN_URN = "iam/auth/refresh-token"
-WHO_URN = "iam/user/v2/who-am-i"
-CONTROL_URN = "rac/basic-idu-control/general-control-command"
-WSS_URL = "wss://notification-global-prod.aircloudhome.com/rac-notifications/websocket"
+HOST_API = "https://api-global-prod.aircloudhome.com/"
+URN_AUTH = "iam/auth/sign-in"
+URN_REFRESH_TOKEN = "iam/auth/refresh-token"
+URN_WHO = "iam/user/v2/who-am-i"
+URN_CONTROL = "rac/basic-idu-control/general-control-command"
+URN_WSS = "wss://notification-global-prod.aircloudhome.com/rac-notifications/websocket"
+SERVICE_EXEC_COMMAND = "exec_command"
+ARG_ID = "id"
+ARG_POWER = "power"
+ARG_TARGET_TEMP = "target_temp"
+ARG_MODE = "mode"
+ARG_FAN_SPEED = "fan_speed"
+ARG_FAN_SWING = "fan_swing"
+ARG_HUMIDITY = "humidity"
+
+
+SERVICE_EXEC_COMMAND_DATA_SCHEMA = vol.Schema(
+    {
+        vol.Required(ARG_ID): cv.positive_int,
+        vol.Required(ARG_POWER): cv.string,
+        vol.Required(ARG_TARGET_TEMP): cv.positive_float,
+        vol.Required(ARG_MODE): cv.string,
+        vol.Required(ARG_FAN_SPEED): cv.string,
+        vol.Required(ARG_FAN_SWING): cv.string,
+        vol.Required(ARG_HUMIDITY): cv.positive_int,
+    }
+)
 
 CONFIG_SCHEMA = vol.Schema(
     {
