@@ -1,0 +1,9 @@
+service: air_cloud.exec_command
+data:
+  id: 15187
+  power: "OFF"
+  target_temp: 20.0
+  mode: "COOLING"
+  fan_speed: "LV1"
+  fan_swing: "OFF"
+  humidity: 0
