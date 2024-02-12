@@ -81,8 +81,12 @@ class AirCloudApi:
 
     async def execute_command(self, id, power, idu_temperature, mode, fan_speed, fan_swing, humidity):
         await self.__refresh_token()
-        command = {"power": power, "iduTemperature": idu_temperature, "mode": mode, "fanSpeed": fan_speed,
-                   "fanSwing": fan_swing, "humidity": humidity}
+        if mode == "FAN" and fan_speed == "AUTO":
+            command = {"power": power, "iduTemperature": "0", "mode": mode, "fanSpeed": "LV2", "fanSwing": fan_swing, "humidity": humidity}
+        elif mode == "FAN":
+            command = {"power": power, "iduTemperature": "0", "mode": mode, "fanSpeed": fan_speed, "fanSwing": fan_swing, "humidity": humidity}
+        else:
+            command = {"power": power, "iduTemperature": idu_temperature, "mode": mode, "fanSpeed": fan_speed, "fanSwing": fan_swing, "humidity": humidity}
         async with self._session.put(HOST_API + URN_CONTROL + "/" + str(id) + "?familyId=" + str(self._family_id),
                                      headers=self.__create_headers(), json=command) as response:
             _LOGGER.debug("AirCloud command request: " + str(command))
