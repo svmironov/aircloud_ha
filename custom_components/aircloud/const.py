@@ -6,7 +6,7 @@ from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
 
 DOMAIN = "air_cloud"
 API = "api"
-PLATFORM_NAME = "climate"
+PLATFORM_CLIMATE = "climate"
 CONF_TEMP_ADJUST = "temp_adjust"
 HOST_API = "https://api-global-prod.aircloudhome.com/"
 URN_AUTH = "iam/auth/sign-in"
@@ -36,21 +36,10 @@ SERVICE_EXEC_COMMAND_DATA_SCHEMA = vol.Schema(
     }
 )
 
-CONFIG_SCHEMA = vol.Schema(
-    {
-        DOMAIN: vol.Schema(
-            {
-                vol.Required(CONF_EMAIL): cv.string,
-                vol.Required(CONF_PASSWORD): cv.string,
-            }
-        )
-    },
-    extra=vol.ALLOW_EXTRA,
-)
-
 CONFIG_FLOW_SCHEMA = vol.Schema(
     {
-        vol.Required(CONF_EMAIL): cv.string,
-        vol.Required(CONF_PASSWORD): cv.string,
+        vol.Required(CONF_EMAIL): str,
+        vol.Required(CONF_PASSWORD): str,
+        vol.Optional(CONF_TEMP_ADJUST): vol.Coerce(float),
     }
 )

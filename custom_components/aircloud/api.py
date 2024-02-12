@@ -22,6 +22,14 @@ class AirCloudApi:
         self._ref_token = None
         self._session = aiohttp.ClientSession()
 
+    async def validate_credentials(self):
+        try:
+            await self.__authenticate()
+            return True
+        except Exception as e:
+            logging.error("Failed to validate credentials: %s", str(e))
+            return False
+
     async def __authenticate(self):
         authorization = {"email": self._login, "password": self._password}
         async with self._session.post(HOST_API + URN_AUTH, json=authorization) as response:
