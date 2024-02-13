@@ -155,7 +155,7 @@ class AirCloudClimateEntity(ClimateEntity):
         elif self._fan_speed == "LV3":
             return FAN_HIGH
         elif self._fan_speed == "LV4":
-            return FAN_MEDIUM
+            return FAN_MIDDLE
         elif self._fan_speed == "LV5":
             return FAN_TOP
         else:
