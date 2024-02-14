@@ -278,10 +278,13 @@ class AirCloudClimateEntity(ClimateEntity):
 
     async def async_update(self):
         if self._update_lock is False:
-            devices = await self._api.load_climate_data()
-            for device in devices:
-                if self._id == device["id"]:
-                    self.__update_data(device)
+            try:
+                devices = await asyncio.wait_for(self._api.load_climate_data(), timeout=10)
+                for device in devices:
+                    if self._id == device["id"]:
+                        self.__update_data(device)
+            except asyncio.TimeoutError:
+                pass
 
     async def __execute_command(self):
         await self._api.execute_command(self._id, self._power, self._target_temp, self._mode, self._fan_speed,
