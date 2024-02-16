@@ -49,3 +49,5 @@ The integration provides a service for a single command:
       fan_speed: LV1 # Speed LV1-LV5 or AUTO
       fan_swing: "OFF" # VERTICAL, HORIZONTAL, BOTH or OFF
       humidity: 0 # It is magic number, select experimentally for your model from 0, 50, 2147483647
+
+All product names, trademarks and registered trademarks in the images in this repository, are property of their respective owners. All images in this repository are used by the project for identification purposes only.
