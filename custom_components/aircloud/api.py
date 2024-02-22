@@ -1,4 +1,5 @@
 import aiohttp
+import asyncio
 import json
 import logging
 import uuid
@@ -62,22 +63,33 @@ class AirCloudApi:
 
     async def load_climate_data(self):
         await self.__refresh_token()
-        async with self._session.ws_connect(URN_WSS) as ws:
+        async with self._session.ws_connect(URN_WSS, timeout=60) as ws:  # Add a timeout value (in seconds) here
             await ws.send_str("CONNECT\naccept-version:1.1,1.2\nheart-beat:10000,10000\nAuthorization:Bearer " +
-                              self._token + "\n\n\0\nSUBSCRIBE\nid:" + str(uuid.uuid4()) + "\ndestination:/notification/"
+                              self._token + "\n\n\0\nSUBSCRIBE\nid:" + str(
+                uuid.uuid4()) + "\ndestination:/notification/"
                               + str(self._family_id) + "/" + str(self._family_id) + "\nack:auto\n\n\0")
 
-            while True:
-                msg = await ws.receive()
-                if msg.type == WSMsgType.TEXT:
-                    response = msg.data
-                    if "{" in response:
-                        break
+            try:
+                attempt = 0
+                max_attempts = 10
+                while attempt < max_attempts:
+                    msg = await asyncio.wait_for(ws.receive(), timeout=10)
+                    if msg.type == WSMsgType.TEXT:
+                        response = msg.data
+                        if "{" in response:
+                            break
+                    attempt += 1
+                else:
+                    _LOGGER.warning("Unable to find '{' symbol after {} attempts".format(max_attempts))
+                    return None
+            except asyncio.TimeoutError:
+                _LOGGER.warning("WebSocket connection timed out while receiving data")
+                return None
 
-            _LOGGER.debug("AirCloud climate data: " + str(response))
-            message = "{" + response.partition("{")[2].replace("\0", "")
-            struct = json.loads(message)
-            return struct["data"]
+        _LOGGER.debug("AirCloud climate data: " + str(response))
+        message = "{" + response.partition("{")[2].replace("\0", "")
+        struct = json.loads(message)
+        return struct["data"]
 
     async def execute_command(self, id, power, idu_temperature, mode, fan_speed, fan_swing, humidity):
         await self.__refresh_token()
