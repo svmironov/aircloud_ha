@@ -39,12 +39,12 @@ class AirCloudApi:
         if self._family_id is None:
             await self.__load_family_id()
 
-    async def __refresh_token(self):
+    async def __refresh_token(self, forced=False):
         now_datetime = datetime.now()
         td = now_datetime - self._last_token_update
         td_minutes = divmod(td.total_seconds(), 60)
 
-        if self._token is None:
+        if self._token is None or forced:
             await self.__authenticate()
         elif td_minutes[1] > 5:
             async with self._session.post(HOST_API + URN_REFRESH_TOKEN,
@@ -63,27 +63,37 @@ class AirCloudApi:
 
     async def load_climate_data(self):
         await self.__refresh_token()
-        async with self._session.ws_connect(URN_WSS, timeout=60) as ws:  # Add a timeout value (in seconds) here
-            await ws.send_str("CONNECT\naccept-version:1.1,1.2\nheart-beat:10000,10000\nAuthorization:Bearer " +
-                              self._token + "\n\n\0\nSUBSCRIBE\nid:" + str(
-                uuid.uuid4()) + "\ndestination:/notification/"
-                              + str(self._family_id) + "/" + str(self._family_id) + "\nack:auto\n\n\0")
+        async with self._session.ws_connect(URN_WSS, timeout=60) as ws:
+            connection_string = "CONNECT\naccept-version:1.1,1.2\nheart-beat:10000,10000\nAuthorization:Bearer {}\n\n\0\nSUBSCRIBE\nid:{}\ndestination:/notification/{}/{}\nack:auto\n\n\0"
+            connection_string = connection_string.format(self._token, str(uuid.uuid4()), str(self._family_id), str(self._family_id))
+            await ws.send_str(connection_string)
 
             try:
                 attempt = 0
                 max_attempts = 10
                 while attempt < max_attempts:
+                    attempt += 1
                     msg = await asyncio.wait_for(ws.receive(), timeout=10)
                     if msg.type == WSMsgType.TEXT:
-                        response = msg.data
-                        if "{" in response:
+                        if msg.data.startswith("CONNECTED") and "user-name:" not in msg.data:
+                            _LOGGER.warning("Websocket connection failed. Re-authenticating.")
+                            await ws.close()
+                            await self.__refresh_token(forced=True)
+                            await ws.send_str(connection_string)
+                            attempt = 0
+                        elif msg.data.startswith("MESSAGE") and "{" in msg.data:
+                            response = msg.data
                             break
-                    attempt += 1
+                    elif msg.type == WSMsgType.CLOSED:
+                        _LOGGER.warning("WebSocket connection is closed.")
+                        return None
                 else:
                     _LOGGER.warning("Unable to find '{' symbol after {} attempts".format(max_attempts))
+                    await ws.close()
                     return None
             except asyncio.TimeoutError:
                 _LOGGER.warning("WebSocket connection timed out while receiving data")
+                await ws.close()
                 return None
 
         _LOGGER.debug("AirCloud climate data: " + str(response))
