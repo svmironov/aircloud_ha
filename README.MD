@@ -2,7 +2,7 @@
 
 ![Logo](https://github.com/svmironov/aircloud_ha/blob/main/custom_components/air_cloud/img/icon.png?raw=true)
 
-This integration allows control Hitachi climate devices whit connected airCloud Home service.
+This integration allows control Hitachi climate devices whit connected airCloud Home service
 
 ## Features
 
