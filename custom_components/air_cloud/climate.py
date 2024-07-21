@@ -70,6 +70,7 @@ class AirCloudClimateEntity(ClimateEntity):
     _attr_has_entity_name = True
 
     def __init__(self, api, device, temp_adjust):
+        self._target_temp = 0
         self._api = api
         self._temp_adjust = temp_adjust
         self._id = device["id"]
@@ -287,8 +288,13 @@ class AirCloudClimateEntity(ClimateEntity):
                 pass
 
     async def __execute_command(self):
-        await self._api.execute_command(self._id, self._power, self._target_temp, self._mode, self._fan_speed,
-                                        self._fan_swing, self._humidity)
+        target_temp = self._target_temp
+
+        if self._mode == "FAN":
+            target_temp = 0
+
+        await self._api.execute_command(self._id, self._power, target_temp, self._mode,
+                                        self._fan_speed, self._fan_swing, self._humidity)
         await asyncio.sleep(10)
         self._update_lock = False
         await self.async_update()
