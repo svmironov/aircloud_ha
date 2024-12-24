@@ -37,9 +37,12 @@ SUPPORT_HVAC = [
 async def _async_setup(hass, async_add):
     api = hass.data[DOMAIN][API]
     temp_adjust = hass.data[DOMAIN][CONF_TEMP_ADJUST]
-    devices = await api.load_climate_data()
-    for device in devices:
-        async_add([AirCloudClimateEntity(api, device, temp_adjust)], update_before_add=False)
+
+    family_ids = await api.load_family_ids()
+    for family_id in family_ids:
+        family_devices = await api.load_climate_data(family_id)
+        for device in family_devices:
+            async_add([AirCloudClimateEntity(api, device, temp_adjust, family_id)], update_before_add=False)
 
 
 async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
@@ -50,26 +53,22 @@ async def async_setup_entry(hass, config_entry, async_add_devices):
     api = hass.data[DOMAIN][API]
     temp_adjust = hass.data[DOMAIN][CONF_TEMP_ADJUST]
 
-    devices = await api.load_climate_data()
     entities = []
-    for device in devices:
-        entities.append(AirCloudClimateEntity(api, device, temp_adjust))
+    family_ids = await api.load_family_ids()
+    for family_id in family_ids:
+        family_devices = await api.load_climate_data(family_id)
+        for device in family_devices:
+            entities.append(AirCloudClimateEntity(api, device, temp_adjust, family_id))
 
     if entities:
         async_add_devices(entities)
-
-
-async def _load_devices(hass):
-    api = hass.data[DOMAIN][API]
-    devices = await api.load_climate_data()
-    return devices
 
 
 class AirCloudClimateEntity(ClimateEntity):
     _enable_turn_on_off_backwards_compatibility = False
     _attr_has_entity_name = True
 
-    def __init__(self, api, device, temp_adjust):
+    def __init__(self, api, device, temp_adjust, family_id):
         self._target_temp = 0
         self._api = api
         self._temp_adjust = temp_adjust
@@ -77,7 +76,9 @@ class AirCloudClimateEntity(ClimateEntity):
         self._name = device["name"]
         self._vendor_id = device["vendorThingId"]
         self._update_lock = False
+        self._family_id = family_id
         self.__update_data(device)
+
 
     @property
     def unique_id(self):
@@ -280,7 +281,7 @@ class AirCloudClimateEntity(ClimateEntity):
     async def async_update(self):
         if self._update_lock is False:
             try:
-                devices = await asyncio.wait_for(self._api.load_climate_data(), timeout=10)
+                devices = await asyncio.wait_for(self._api.load_climate_data(self._family_id), timeout=10)
                 for device in devices:
                     if self._id == device["id"]:
                         self.__update_data(device)
@@ -293,7 +294,7 @@ class AirCloudClimateEntity(ClimateEntity):
         if self._mode == "FAN":
             target_temp = 0
 
-        await self._api.execute_command(self._id, self._power, target_temp, self._mode,
+        await self._api.execute_command(self._id, self._family_id, self._power, target_temp, self._mode,
                                         self._fan_speed, self._fan_swing, self._humidity)
         await asyncio.sleep(10)
         self._update_lock = False

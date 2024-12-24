@@ -18,7 +18,6 @@ class AirCloudApi:
         self._last_token_update = datetime.now()
         self._last_data_update = datetime.now()
         self._token = None
-        self._family_id = None
         self._data = None
         self._ref_token = None
         self._session = aiohttp.ClientSession()
@@ -36,8 +35,6 @@ class AirCloudApi:
         async with self._session.post(HOST_API + URN_AUTH, json=authorization) as response:
             await self.__update_token_data(await response.json())
         self._last_token_update = datetime.now()
-        if self._family_id is None:
-            await self.__load_family_id()
 
     async def __refresh_token(self, forced=False):
         now_datetime = datetime.now()
@@ -57,15 +54,18 @@ class AirCloudApi:
         self._token = response["token"]
         self._ref_token = response["refreshToken"]
 
-    async def __load_family_id(self):
+    async def load_family_ids(self):
+        await self.__refresh_token()
         async with self._session.get(HOST_API + URN_WHO, headers=self.__create_headers()) as response:
-            self._family_id = (await response.json())["familyId"]
+            response_data = await response.json()
+            family_ids = [item["familyId"] for item in response_data]
+            return family_ids
 
-    async def load_climate_data(self):
+    async def load_climate_data(self, family_id):
         await self.__refresh_token()
         async with self._session.ws_connect(URN_WSS, timeout=60) as ws:
             connection_string = "CONNECT\naccept-version:1.1,1.2\nheart-beat:10000,10000\nAuthorization:Bearer {}\n\n\0\nSUBSCRIBE\nid:{}\ndestination:/notification/{}/{}\nack:auto\n\n\0"
-            connection_string = connection_string.format(self._token, str(uuid.uuid4()), str(self._family_id), str(self._family_id))
+            connection_string = connection_string.format(self._token, str(uuid.uuid4()), str(family_id), str(family_id))
             await ws.send_str(connection_string)
 
             try:
@@ -101,11 +101,11 @@ class AirCloudApi:
         struct = json.loads(message)
         return struct["data"]
 
-    async def execute_command(self, id, power, idu_temperature, mode, fan_speed, fan_swing, humidity):
+    async def execute_command(self, id, family_id, power, idu_temperature, mode, fan_speed, fan_swing, humidity):
         await self.__refresh_token()
         command = {"power": power, "iduTemperature": idu_temperature, "mode": mode, "fanSpeed": fan_speed,
                    "fanSwing": fan_swing, "humidity": humidity}
-        async with self._session.put(HOST_API + URN_CONTROL + "/" + str(id) + "?familyId=" + str(self._family_id),
+        async with self._session.put(HOST_API + URN_CONTROL + "/" + str(id) + "?familyId=" + str(family_id),
                                      headers=self.__create_headers(), json=command) as response:
             _LOGGER.debug("AirCloud command request: " + str(command))
             _LOGGER.debug("AirCloud command response: " + str(await response.text()))
