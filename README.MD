@@ -18,6 +18,7 @@ First install HACS if you don't have it yet. Add https://github.com/svmironov/ai
 
 You can add integration in the UI or manual in configuration.yml
 
+```yml
     air_cloud:
         email: "login" # supported only email authorization
         password: "pass"
@@ -25,13 +26,16 @@ You can add integration in the UI or manual in configuration.yml
 
     climate:
        - platform: air_cloud
+```         
 
 All devices be loaded from AirCloud. For every device be created HA entity with name from AirCloud
 
 ## Sample lovelace object
 
+```yml
       - type: thermostat
         entity: climate.kitchen_ac
+```
 
 ## Usages
 
@@ -40,14 +44,16 @@ AirCloud API have low performance. Execution of commands and updating the UI occ
 
 The integration provides a service for a single command: 
 
-    service: air_cloud.exec_command
+```yml service: air_cloud.exec_command
     data:
-      id: 15187 # AirCloud ID from developer panel 
+      id: 15187 # AirCloud ID from developer panel
+      family_id: 809423 # family_id from developer panel 
       power: "OFF" # ON/OFF
       target_temp: 24 
       mode: COOLING # HEATING, COOLING, FAN, DRY or AUTO
       fan_speed: LV1 # Speed LV1-LV5 or AUTO
       fan_swing: "OFF" # VERTICAL, HORIZONTAL, BOTH or OFF
       humidity: 0 # It is magic number, select experimentally for your model from 0, 50, 2147483647
+```
 
 All product names, trademarks and registered trademarks in the images in this repository, are property of their respective owners. All images in this repository are used by the project for identification purposes only.

@@ -86,7 +86,7 @@ class AirCloudClimateEntity(ClimateEntity):
 
     @property
     def extra_state_attributes(self):
-        return {"air_cloud_id": self._id}
+        return {"family_id": self._family_id, "air_cloud_id": self._id}
 
     @property
     def supported_features(self):

@@ -16,6 +16,7 @@ URN_CONTROL = "rac/basic-idu-control/general-control-command"
 URN_WSS = "wss://notification-global-prod.aircloudhome.com/rac-notifications/websocket"
 SERVICE_EXEC_COMMAND = "exec_command"
 ARG_ID = "id"
+ARG_FAMILY_ID = "family_id"
 ARG_POWER = "power"
 ARG_TARGET_TEMP = "target_temp"
 ARG_MODE = "mode"
@@ -27,6 +28,7 @@ ARG_HUMIDITY = "humidity"
 SERVICE_EXEC_COMMAND_DATA_SCHEMA = vol.Schema(
     {
         vol.Required(ARG_ID): cv.positive_int,
+        vol.Required(ARG_FAMILY_ID): cv.positive_int,
         vol.Required(ARG_POWER): cv.string,
         vol.Required(ARG_TARGET_TEMP): cv.positive_float,
         vol.Required(ARG_MODE): cv.string,

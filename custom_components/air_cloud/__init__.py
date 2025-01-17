@@ -3,7 +3,7 @@ from homeassistant.core import HomeAssistant
 
 from .const import (DOMAIN, PLATFORM_CLIMATE, API, CONF_EMAIL, CONF_PASSWORD,
                     CONF_TEMP_ADJUST, SERVICE_EXEC_COMMAND, SERVICE_EXEC_COMMAND_DATA_SCHEMA,
-                    ARG_ID, ARG_POWER, ARG_TARGET_TEMP, ARG_MODE,
+                    ARG_ID, ARG_FAMILY_ID, ARG_POWER, ARG_TARGET_TEMP, ARG_MODE,
                     ARG_FAN_SPEED, ARG_FAN_SWING, ARG_HUMIDITY)
 from .api import AirCloudApi
 
@@ -37,6 +37,7 @@ async def async_setup(hass: HomeAssistant, config: dict):
     async def service_exec_command(service_call):
         service_data = service_call.data
         await hass.data[DOMAIN][API].execute_command(service_data[ARG_ID],
+                                                     service_data[ARG_FAMILY_ID],
                                                      service_data[ARG_POWER],
                                                      service_data[ARG_TARGET_TEMP],
                                                      service_data[ARG_MODE],
