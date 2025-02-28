@@ -312,7 +312,6 @@ class AirCloudClimateEntity(ClimateEntity):
         self._fan_speed = climate_data["fanSpeed"]
         self._fan_swing = climate_data["fanSwing"]
 
-        self._humidity = 0
-        h = climate_data["humidity"]
-        if h < 2147483647:
+        self._humidity = climate_data.get("humidity", 0)
+        if self._humidity < 2147483647:
             self._humidity = 50
