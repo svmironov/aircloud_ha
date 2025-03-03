@@ -32,6 +32,7 @@ SUPPORT_HVAC = [
     HVACMode.AUTO,
     HVACMode.HEAT
 ]
+NO_HUMIDITY_VALUE = 2147483647
 
 
 async def _async_setup(hass, async_add):
@@ -313,5 +314,7 @@ class AirCloudClimateEntity(ClimateEntity):
         self._fan_swing = climate_data["fanSwing"]
 
         self._humidity = climate_data.get("humidity", 0)
-        if self._humidity < 2147483647:
+        if self._humidity < NO_HUMIDITY_VALUE:
             self._humidity = 50
+        elif self._humidity == NO_HUMIDITY_VALUE:
+            self._humidity = 0
