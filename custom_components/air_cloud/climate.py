@@ -302,13 +302,12 @@ class AirCloudClimateEntity(ClimateEntity):
         await self.async_update()
 
     def __update_data(self, climate_data):
-        raise RuntimeError(f"AirCloud Test: {climate_data}")
         self._power = climate_data["power"]
         self._mode = climate_data["mode"]
         self._target_temp = climate_data["iduTemperature"]
 
-        self._room_temp = climate_data["roomTemperature"]
-        if self._temp_adjust is not None:
+        self._room_temp = climate_data.get("roomTemperature")
+        if self._room_temp is not None and self._temp_adjust is not None:
             self._room_temp = self._room_temp + self._temp_adjust
 
         self._fan_speed = climate_data["fanSpeed"]
