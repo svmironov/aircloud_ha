@@ -110,7 +110,7 @@ class AirCloudClimateEntity(ClimateEntity):
 
     @property
     def target_temperature_step(self):
-        return 0.5
+        return 1
 
     @property
     def max_temp(self):
