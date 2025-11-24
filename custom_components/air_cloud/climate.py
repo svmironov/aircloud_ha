@@ -314,16 +314,18 @@ class AirCloudClimateEntity(ClimateEntity):
         self._target_temp = climate_data["iduTemperature"]
 
         self._room_temp = climate_data["roomTemperature"]
-        
+
         # Get adjustment from shared data
         adjust_data = self._hass.data[DOMAIN].get(CONF_TEMP_ADJUST, {})
         temp_adjust = adjust_data.get(self._id)
-        
+
         # Fallback to global if not set specifically
         if temp_adjust is None:
              temp_adjust = adjust_data.get("global")
 
-        if temp_adjust is not None:
+        self._room_temp = climate_data.get("roomTemperature")
+
+        if self._room_temp is not None:
             self._room_temp = self._room_temp + temp_adjust
 
         self._fan_speed = climate_data["fanSpeed"]
