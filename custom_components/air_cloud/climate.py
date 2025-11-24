@@ -78,7 +78,6 @@ class AirCloudClimateEntity(ClimateEntity):
         self._family_id = family_id
         self.__update_data(device)
 
-
     @property
     def unique_id(self):
         return self._vendor_id
@@ -319,9 +318,8 @@ class AirCloudClimateEntity(ClimateEntity):
         adjust_data = self._hass.data[DOMAIN].get(CONF_TEMP_ADJUST, {})
         temp_adjust = adjust_data.get(self._id)
 
-        # Fallback to global if not set specifically
         if temp_adjust is None:
-             temp_adjust = adjust_data.get("global")
+            temp_adjust = 0.0
 
         self._room_temp = climate_data.get("roomTemperature")
 
