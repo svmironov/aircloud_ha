@@ -7,6 +7,7 @@ from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
 DOMAIN = "air_cloud"
 API = "api"
 PLATFORM_CLIMATE = "climate"
+PLATFORM_NUMBER = "number"
 CONF_TEMP_ADJUST = "temp_adjust"
 HOST_API = "https://api-global-prod.aircloudhome.com/"
 URN_AUTH = "iam/auth/sign-in"
