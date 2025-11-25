@@ -22,7 +22,6 @@ You can add integration in the UI or manual in configuration.yml
     air_cloud:
         email: "login" # supported only email authorization
         password: "pass"
-        temp_adjust: -1 # optional parameter for adjustment current temp
 
     climate:
        - platform: air_cloud
@@ -56,4 +55,6 @@ The integration provides a service for a single command:
       humidity: 0 # It is magic number, select experimentally for your model from 0, 50, 2147483647
 ```
 
-All product names, trademarks and registered trademarks in the images in this repository, are property of their respective owners. All images in this repository are used by the project for identification purposes only.
+This software is not affiliated with or endorsed by Hitachi or any of its affiliated companies. Use of this software is entirely at your own risk. Under no circumstances shall the author be held liable for any damage, loss of property, or harm to third parties resulting from the use of this software.
+
+All product names, trademarks, and registered trademarks mentioned or shown in this repository are the property of their respective owners. All images in this repository are used solely for identification purposes.
