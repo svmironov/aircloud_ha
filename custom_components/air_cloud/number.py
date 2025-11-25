@@ -34,9 +34,7 @@ class AirCloudTempAdjustNumber(RestoreNumber):
         if last_state:
             self._attr_native_value = last_state.native_value
         else:
-            # Default to global setting if available, else 0
-            global_adjust = self._hass.data[DOMAIN][CONF_TEMP_ADJUST].get("global", 0.0)
-            self._attr_native_value = global_adjust
+            self._attr_native_value = 0.0
         
         self._update_shared_data()
 

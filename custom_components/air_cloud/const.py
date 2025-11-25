@@ -43,6 +43,5 @@ CONFIG_FLOW_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_EMAIL): str,
         vol.Required(CONF_PASSWORD): str,
-        vol.Optional(CONF_TEMP_ADJUST): vol.Coerce(float),
     }
 )

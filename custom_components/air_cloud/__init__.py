@@ -13,12 +13,9 @@ PLATFORMS = [PLATFORM_CLIMATE, PLATFORM_NUMBER]
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     login = entry.data.get(CONF_EMAIL)
     password = entry.data.get(CONF_PASSWORD)
-    temp_adjust = entry.data.get(CONF_TEMP_ADJUST)
 
     api = AirCloudApi(login, password)
     hass.data[DOMAIN] = {API: api, CONF_TEMP_ADJUST: {}}
-    if temp_adjust is not None:
-         hass.data[DOMAIN][CONF_TEMP_ADJUST]["global"] = temp_adjust
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
@@ -31,12 +28,9 @@ async def async_setup(hass: HomeAssistant, config: dict):
     if conf:
         login = config[DOMAIN].get(CONF_EMAIL)
         password = config[DOMAIN].get(CONF_PASSWORD)
-        temp_adjust = config[DOMAIN].get(CONF_TEMP_ADJUST)
 
         api = AirCloudApi(login, password)
         hass.data[DOMAIN] = {API: api, CONF_TEMP_ADJUST: {}}
-        if temp_adjust is not None:
-             hass.data[DOMAIN][CONF_TEMP_ADJUST]["global"] = temp_adjust
 
     async def service_exec_command(service_call):
         service_data = service_call.data
