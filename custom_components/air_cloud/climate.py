@@ -9,7 +9,7 @@ from homeassistant.components.climate.const import (FAN_AUTO, FAN_HIGH,
 from homeassistant.const import ATTR_TEMPERATURE, UnitOfTemperature
 from homeassistant.components.climate.const import HVACMode, ClimateEntityFeature
 
-from .const import DOMAIN, API, CONF_TEMP_ADJUST
+from .const import DOMAIN, API, CONF_TEMP_ADJUST, CONF_TEMP_STEP
 
 SUPPORT_FAN = [
     FAN_AUTO,
@@ -116,7 +116,11 @@ class AirCloudClimateEntity(ClimateEntity):
 
     @property
     def target_temperature_step(self):
-        return 0.5
+        step_data = self._hass.data[DOMAIN].get(CONF_TEMP_STEP, {})
+        step = step_data.get(self._id)
+        if step is None:
+            return 0.5
+        return step
 
     @property
     def max_temp(self):
