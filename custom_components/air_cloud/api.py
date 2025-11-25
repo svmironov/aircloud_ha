@@ -67,6 +67,8 @@ class AirCloudApi:
             return family_ids
 
     async def load_climate_data(self, family_id):
+        if self._session.closed:
+            return []
         await self.__refresh_token()
 
         # Открываем новое соединение
@@ -141,6 +143,8 @@ class AirCloudApi:
         return struct["data"]
 
     async def execute_command(self, id, family_id, power, idu_temperature, mode, fan_speed, fan_swing, humidity):
+        if self._session.closed:
+            return
         await self.__refresh_token()
         command = {
             "power": power,

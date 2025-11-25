@@ -54,5 +54,10 @@ async def async_setup(hass: HomeAssistant, config: dict):
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
-    await hass.data[DOMAIN][API].close_session()
-    return await hass.config_entries.async_forward_entry_unload(entry, PLATFORMS)
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+
+    if unload_ok:
+        await hass.data[DOMAIN][API].close_session()
+        hass.data.pop(DOMAIN)
+
+    return unload_ok
