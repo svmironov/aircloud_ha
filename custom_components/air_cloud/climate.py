@@ -9,7 +9,7 @@ from homeassistant.components.climate.const import (FAN_AUTO, FAN_HIGH,
 from homeassistant.const import ATTR_TEMPERATURE, UnitOfTemperature
 from homeassistant.components.climate.const import HVACMode, ClimateEntityFeature
 
-from .const import DOMAIN, API, CONF_TEMP_ADJUST
+from .const import DOMAIN, API, CONF_TEMP_ADJUST, CONF_TEMP_STEP
 
 SUPPORT_FAN = [
     FAN_AUTO,
@@ -43,7 +43,7 @@ async def _async_setup(hass, async_add):
     for family_id in family_ids:
         family_devices = await api.load_climate_data(family_id)
         for device in family_devices:
-            async_add([AirCloudClimateEntity(api, device, temp_adjust, family_id)], update_before_add=False)
+            async_add([AirCloudClimateEntity(api, device, hass, family_id)], update_before_add=False)
 
 
 async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
@@ -52,14 +52,12 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
 
 async def async_setup_entry(hass, config_entry, async_add_devices):
     api = hass.data[DOMAIN][API]
-    temp_adjust = hass.data[DOMAIN][CONF_TEMP_ADJUST]
-
     entities = []
     family_ids = await api.load_family_ids()
     for family_id in family_ids:
         family_devices = await api.load_climate_data(family_id)
         for device in family_devices:
-            entities.append(AirCloudClimateEntity(api, device, temp_adjust, family_id))
+            entities.append(AirCloudClimateEntity(api, device, hass, family_id))
 
     if entities:
         async_add_devices(entities)
@@ -69,10 +67,10 @@ class AirCloudClimateEntity(ClimateEntity):
     _enable_turn_on_off_backwards_compatibility = False
     _attr_has_entity_name = True
 
-    def __init__(self, api, device, temp_adjust, family_id):
+    def __init__(self, api, device, hass, family_id):
         self._target_temp = 0
         self._api = api
-        self._temp_adjust = temp_adjust
+        self._hass = hass
         self._id = device["id"]
         self._name = device["name"]
         self._vendor_id = device["vendorThingId"]
@@ -80,10 +78,18 @@ class AirCloudClimateEntity(ClimateEntity):
         self._family_id = family_id
         self.__update_data(device)
 
-
     @property
     def unique_id(self):
         return self._vendor_id
+
+    @property
+    def device_info(self):
+        return {
+            "identifiers": {(DOMAIN, self._vendor_id)},
+            "name": self._name,
+            "manufacturer": "Hitachi",
+            "model": "AirCloud Climate",
+        }
 
     @property
     def extra_state_attributes(self):
@@ -110,7 +116,11 @@ class AirCloudClimateEntity(ClimateEntity):
 
     @property
     def target_temperature_step(self):
-        return 0.5
+        step_data = self._hass.data[DOMAIN].get(CONF_TEMP_STEP, {})
+        step = step_data.get(self._id)
+        if step is None:
+            return 0.5
+        return step
 
     @property
     def max_temp(self):
@@ -312,9 +322,19 @@ class AirCloudClimateEntity(ClimateEntity):
         else:
             self._target_temp = climate_data["iduTemperature"]
 
+        self._room_temp = climate_data["roomTemperature"]
+
+        # Get adjustment from shared data
+        adjust_data = self._hass.data[DOMAIN].get(CONF_TEMP_ADJUST, {})
+        temp_adjust = adjust_data.get(self._id)
+
+        if temp_adjust is None:
+            temp_adjust = 0.0
+
         self._room_temp = climate_data.get("roomTemperature")
-        if self._room_temp is not None and self._temp_adjust is not None:
-            self._room_temp = self._room_temp + self._temp_adjust
+
+        if self._room_temp is not None:
+            self._room_temp = self._room_temp + temp_adjust
 
         self._fan_speed = climate_data["fanSpeed"]
         self._fan_swing = climate_data["fanSwing"]
