@@ -165,7 +165,7 @@ class AirCloudClimateEntity(ClimateEntity):
             return FAN_MEDIUM
         elif self._fan_speed == "LV3":
             return FAN_MIDDLE
-        elif self._fan_speed == "LV4":
+        elif self._fan_speed == "LV4" or self._fan_speed == "LV5":
             return FAN_HIGH
         else:
             return FAN_AUTO
@@ -181,37 +181,13 @@ class AirCloudClimateEntity(ClimateEntity):
         elif self._fan_swing == "HORIZONTAL":
             return SWING_HORIZONTAL
         elif self._fan_swing == "BOTH":
-            return SWING_VERTICAL
+            return SWING_BOTH
         else:
             return SWING_OFF
 
     @property
     def swing_modes(self):
         return SUPPORT_SWING
-
-    def turn_on(self):
-        asyncio.run(self.async_turn_on())
-
-    def turn_off(self):
-        asyncio.run(self.async_turn_off())
-
-    def set_hvac_mode(self, hvac_mode):
-        asyncio.run(self.async_set_hvac_mode(hvac_mode))
-
-    def set_preset_mode(self, preset_mode):
-        asyncio.run(self.async_set_preset_mode(preset_mode))
-
-    def set_fan_mode(self, fan_mode):
-        asyncio.run(self.async_set_fan_mode(fan_mode))
-
-    def set_swing_mode(self, swing_mode):
-        asyncio.run(self.async_set_swing_mode(swing_mode))
-
-    def set_temperature(self, **kwargs):
-        asyncio.run(self.async_set_temperature(**kwargs))
-
-    def update(self):
-        asyncio.run(self.async_update())
 
     async def async_turn_on(self):
         self._power = "ON"
@@ -254,12 +230,12 @@ class AirCloudClimateEntity(ClimateEntity):
             self._fan_speed = "AUTO"
         elif fan_mode == FAN_LOW:
             self._fan_speed = "LV1"
-        elif fan_mode == FAN_MIDDLE:
-            self._fan_speed = "LV2"
         elif fan_mode == FAN_MEDIUM:
+            self._fan_speed = "LV2"
+        elif fan_mode == FAN_MIDDLE:
             self._fan_speed = "LV3"
         elif fan_mode == FAN_HIGH:
-            self._fan_speed = "LV4"
+            self._fan_speed = "LV5"
         else:
             self._fan_speed = "AUTO"
 
@@ -333,8 +309,5 @@ class AirCloudClimateEntity(ClimateEntity):
         self._fan_speed = climate_data["fanSpeed"]
         self._fan_swing = climate_data["fanSwing"]
 
+        # Keep the humidity value as-is from API for sending commands
         self._humidity = climate_data.get("humidity", 0)
-        if self._humidity < NO_HUMIDITY_VALUE:
-            self._humidity = 50
-        elif self._humidity == NO_HUMIDITY_VALUE:
-            self._humidity = 0
