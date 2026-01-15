@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 from aiohttp import WSMsgType
 
-from .const import HOST_API, URN_AUTH, URN_WHO, URN_WSS, URN_CONTROL, URN_REFRESH_TOKEN, URN_ENERGY_CONSUMPTION_SUMMARY
+from .const import HOST_API, URN_AUTH, URN_WHO, URN_WSS, URN_CONTROL, URN_REFRESH_TOKEN, URN_ENERGY_CONSUMPTION_SUMMARY, URN_RAC_CONFIGURATION
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -72,6 +72,15 @@ class AirCloudApi:
             f"{HOST_API}{URN_ENERGY_CONSUMPTION_SUMMARY}?familyId={family_id}",
             headers=self.__create_headers(),
             json={"from": "2000-01-01", "to": "2099-12-31"}
+        ) as response:
+            return await response.json()
+
+    async def load_rac_configuration(self, cloud_ids):
+        await self.__refresh_token()
+        async with self._session.post(
+            HOST_API + URN_RAC_CONFIGURATION,
+            headers=self.__create_headers(),
+            json=cloud_ids
         ) as response:
             return await response.json()
 
