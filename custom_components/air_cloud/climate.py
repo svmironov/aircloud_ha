@@ -236,7 +236,7 @@ class AirCloudClimateEntity(ClimateEntity):
         elif self._fan_swing == "HORIZONTAL":
             return SWING_HORIZONTAL
         elif self._fan_swing == "BOTH":
-            return SWING_VERTICAL
+            return SWING_BOTH
         else:
             return SWING_OFF
 
