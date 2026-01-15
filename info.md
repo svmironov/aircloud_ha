@@ -8,6 +8,7 @@ For change temperature with step 0.5 recommend uses a alternative thermostat UI
 * Temperature change
 * Modes: HEATING, COOLING, FAN, DRY
 * Swing modes: VERTICAL, HORIZONTAL, BOTH
+* Energy Consumption (requires activation of "Energy Cost" in the AirCloud app).
 
 Integration does not currently support authorization by a phone and FrostWash mode. You're a model may not support some modes, but you will see it in the UI.
 
