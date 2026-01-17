@@ -1,11 +1,17 @@
 import asyncio
 from homeassistant.components.climate import ClimateEntity
-from homeassistant.components.climate.const import (FAN_AUTO, FAN_OFF,
-                                                    FAN_LOW, FAN_MEDIUM,
-                                                    FAN_HIGH, SWING_OFF,
-                                                    SWING_VERTICAL,
-                                                    SWING_HORIZONTAL,
-                                                    SWING_BOTH)
+from homeassistant.components.climate.const import (
+    FAN_AUTO,
+    FAN_OFF,
+    FAN_LOW,
+    FAN_MIDDLE,
+    FAN_MEDIUM,
+    FAN_HIGH,
+    SWING_OFF,
+    SWING_VERTICAL,
+    SWING_HORIZONTAL,
+    SWING_BOTH,
+)
 from homeassistant.const import ATTR_TEMPERATURE, UnitOfTemperature
 from homeassistant.components.climate.const import HVACMode, ClimateEntityFeature
 
@@ -219,11 +225,11 @@ class AirCloudClimateEntity(ClimateEntity):
         elif self._fan_speed == "LV2":
             return FAN_LOW
         elif self._fan_speed == "LV3":
-            return FAN_MEDIUM
+            return FAN_MIDDLE
         elif self._fan_speed == "LV4":
-            return "Level 4"
+            return FAN_MEDIUM
         elif self._fan_speed == "LV5":
-            return "Level 5"
+            return FAN_HIGH
         else:
             return FAN_AUTO
 
@@ -313,11 +319,11 @@ class AirCloudClimateEntity(ClimateEntity):
             self._fan_speed = "LV1"
         elif fan_mode == FAN_LOW:
             self._fan_speed = "LV2"
-        elif fan_mode == "Level 3":
+        elif fan_mode == FAN_MIDDLE:
             self._fan_speed = "LV3"
-        elif fan_mode == "Level 4":
+        elif fan_mode == FAN_MEDIUM:
             self._fan_speed = "LV4"
-        elif fan_mode == "Level 5":
+        elif fan_mode == FAN_HIGH:
             self._fan_speed = "LV5"
         else:
             self._fan_speed = "AUTO"
