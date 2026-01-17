@@ -7,13 +7,18 @@ from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
 DOMAIN = "air_cloud"
 API = "api"
 PLATFORM_CLIMATE = "climate"
+PLATFORM_NUMBER = "number"
+PLATFORM_SENSOR = "sensor"
 CONF_TEMP_ADJUST = "temp_adjust"
+CONF_TEMP_STEP = "temp_step"
 HOST_API = "https://api-global-prod.aircloudhome.com/"
 URN_AUTH = "iam/auth/sign-in"
 URN_REFRESH_TOKEN = "iam/auth/refresh-token"
 URN_WHO = "rac/location-controls/status"
 URN_CONTROL = "rac/basic-idu-control/general-control-command"
 URN_WSS = "wss://notification-global-prod.aircloudhome.com/rac-notifications/websocket"
+URN_ENERGY_CONSUMPTION_SUMMARY = "rac/energy-consumptions/summary/v3"
+URN_RAC_CONFIGURATION = "rac/model-wise/rac-configuration"
 SERVICE_EXEC_COMMAND = "exec_command"
 ARG_ID = "id"
 ARG_FAMILY_ID = "family_id"
@@ -42,6 +47,5 @@ CONFIG_FLOW_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_EMAIL): str,
         vol.Required(CONF_PASSWORD): str,
-        vol.Optional(CONF_TEMP_ADJUST): vol.Coerce(float),
     }
 )

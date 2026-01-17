@@ -11,7 +11,6 @@ class AirCloudConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             login = user_input[CONF_EMAIL]
             password = user_input[CONF_PASSWORD]
-            temp_adjust = user_input.get(CONF_TEMP_ADJUST)
 
             if await AirCloudApi(login, password).validate_credentials():
                 return self.async_create_entry(title=login, data=user_input)

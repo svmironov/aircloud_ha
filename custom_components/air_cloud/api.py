@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 from aiohttp import WSMsgType
 
-from .const import HOST_API, URN_AUTH, URN_WHO, URN_WSS, URN_CONTROL, URN_REFRESH_TOKEN
+from .const import HOST_API, URN_AUTH, URN_WHO, URN_WSS, URN_CONTROL, URN_REFRESH_TOKEN, URN_ENERGY_CONSUMPTION_SUMMARY, URN_RAC_CONFIGURATION
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -66,7 +66,27 @@ class AirCloudApi:
             family_ids = [item["familyId"] for item in response_data]
             return family_ids
 
+    async def load_energy_consumption_summary(self, family_id):
+        await self.__refresh_token()
+        async with self._session.post(
+            f"{HOST_API}{URN_ENERGY_CONSUMPTION_SUMMARY}?familyId={family_id}",
+            headers=self.__create_headers(),
+            json={"from": "2000-01-01", "to": "2099-12-31"}
+        ) as response:
+            return await response.json()
+
+    async def load_rac_configuration(self, cloud_ids):
+        await self.__refresh_token()
+        async with self._session.post(
+            HOST_API + URN_RAC_CONFIGURATION,
+            headers=self.__create_headers(),
+            json=cloud_ids
+        ) as response:
+            return await response.json()
+
     async def load_climate_data(self, family_id):
+        if self._session.closed:
+            return []
         await self.__refresh_token()
 
         # Открываем новое соединение
@@ -141,6 +161,8 @@ class AirCloudApi:
         return struct["data"]
 
     async def execute_command(self, id, family_id, power, idu_temperature, mode, fan_speed, fan_swing, humidity):
+        if self._session.closed:
+            return
         await self.__refresh_token()
         command = {
             "power": power,
