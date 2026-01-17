@@ -126,15 +126,15 @@ class AirCloudClimateEntity(ClimateEntity):
                      available_speeds.add(speed)
         
         if "LV1" in available_speeds:
-            self._attr_fan_modes.append("Level 1")
+            self._attr_fan_modes.append(FAN_OFF)
         if "LV2" in available_speeds:
-             self._attr_fan_modes.append("Level 2")
+             self._attr_fan_modes.append(FAN_LOW)
         if "LV3" in available_speeds:
-             self._attr_fan_modes.append("Level 3")
+             self._attr_fan_modes.append(FAN_MIDDLE)
         if "LV4" in available_speeds:
-             self._attr_fan_modes.append("Level 4")
+             self._attr_fan_modes.append(FAN_MEDIUM)
         if "LV5" in available_speeds:
-             self._attr_fan_modes.append("Level 5")
+             self._attr_fan_modes.append(FAN_HIGH)
 
     @property
     def unique_id(self):
