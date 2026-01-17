@@ -8,5 +8,5 @@
   "iot_class": "cloud_push",
   "config_flow": true,
   "requirements": ["websocket-client>=1.5.1", "aiohttp>=3.9.3"],
-  "version": "2.1.0"
+  "version": "2.2.0"
 }

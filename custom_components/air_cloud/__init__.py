@@ -1,13 +1,13 @@
 from homeassistant.config_entries import SOURCE_IMPORT, ConfigEntry
 from homeassistant.core import HomeAssistant
 
-from .const import (DOMAIN, PLATFORM_CLIMATE, PLATFORM_NUMBER, API, CONF_EMAIL, CONF_PASSWORD,
+from .const import (DOMAIN, PLATFORM_CLIMATE, PLATFORM_NUMBER, PLATFORM_SENSOR, API, CONF_EMAIL, CONF_PASSWORD,
                     CONF_TEMP_ADJUST, CONF_TEMP_STEP, SERVICE_EXEC_COMMAND, SERVICE_EXEC_COMMAND_DATA_SCHEMA,
                     ARG_ID, ARG_FAMILY_ID, ARG_POWER, ARG_TARGET_TEMP, ARG_MODE,
                     ARG_FAN_SPEED, ARG_FAN_SWING, ARG_HUMIDITY)
 from .api import AirCloudApi
 
-PLATFORMS = [PLATFORM_CLIMATE, PLATFORM_NUMBER]
+PLATFORMS = [PLATFORM_CLIMATE, PLATFORM_NUMBER, PLATFORM_SENSOR]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):

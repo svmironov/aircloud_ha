@@ -9,6 +9,7 @@ This integration allows control Hitachi climate devices whit connected airCloud 
 * Temperature change
 * Modes: HEATING, COOLING, FAN, DRY
 * Swing modes: VERTICAL, HORIZONTAL, BOTH
+* Energy Consumption (requires activation of "Energy Cost" in the AirCloud app).
 
 ## Installation
 
