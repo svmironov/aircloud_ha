@@ -160,18 +160,28 @@ class AirCloudApi:
         struct = json.loads(message)
         return struct["data"]
 
-    async def execute_command(self, id, family_id, power, idu_temperature, mode, fan_speed, fan_swing, humidity):
+    async def execute_command(self, id, family_id, power, temperature, mode, fan_speed, fan_swing, humidity):
         if self._session.closed:
             return
         await self.__refresh_token()
-        command = {
+        if mode == "AUTO":
+            command = {
             "power": power,
-            "iduTemperature": idu_temperature,
+            "relativeTemperature": temperature,
             "mode": mode,
             "fanSpeed": fan_speed,
             "fanSwing": fan_swing,
             "humidity": humidity
-        }
+            }
+        else:
+            command = {
+            "power": power,
+            "iduTemperature": temperature,
+            "mode": mode,
+            "fanSpeed": fan_speed,
+            "fanSwing": fan_swing,
+            "humidity": humidity
+            }
         async with self._session.put(
             f"{HOST_API}{URN_CONTROL}/{id}?familyId={family_id}",
             headers=self.__create_headers(),
