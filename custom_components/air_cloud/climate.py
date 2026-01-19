@@ -1,17 +1,9 @@
 import asyncio
 from homeassistant.components.climate import ClimateEntity
-from homeassistant.components.climate.const import (
-    FAN_AUTO,
-    FAN_OFF,
-    FAN_LOW,
-    FAN_MIDDLE,
-    FAN_MEDIUM,
-    FAN_HIGH,
-    SWING_OFF,
-    SWING_VERTICAL,
-    SWING_HORIZONTAL,
-    SWING_BOTH,
-)
+from homeassistant.components.climate.const import (FAN_AUTO, SWING_OFF,
+                                                    SWING_VERTICAL,
+                                                    SWING_HORIZONTAL,
+                                                    SWING_BOTH)
 from homeassistant.const import ATTR_TEMPERATURE, UnitOfTemperature
 from homeassistant.components.climate.const import HVACMode, ClimateEntityFeature
 
@@ -39,16 +31,16 @@ async def async_setup_entry(hass, config_entry, async_add_devices):
     api = hass.data[DOMAIN][API]
     entities = []
     family_ids = await api.load_family_ids()
-    
+
     cloud_ids = []
     all_devices = []
 
     for family_id in family_ids:
         family_devices = await api.load_climate_data(family_id)
         for device in family_devices:
-             cloud_ids.append(device["cloudId"])
-             all_devices.append((device, family_id))
-    
+            cloud_ids.append(device["cloudId"])
+            all_devices.append((device, family_id))
+
     if cloud_ids:
         rac_configs = await api.load_rac_configuration(cloud_ids)
         rac_config_map = {config["cloudId"]: config for config in rac_configs}
@@ -109,32 +101,32 @@ class AirCloudClimateEntity(ClimateEntity):
         swing_config = rac_config.get("swing", {})
         vertical = swing_config.get("VERTICAL", False)
         horizontal = swing_config.get("HORIZONTAL", False)
-        
+
         if vertical:
             self._attr_swing_modes.append(SWING_VERTICAL)
         if horizontal:
             self._attr_swing_modes.append(SWING_HORIZONTAL)
         if vertical and horizontal:
-             self._attr_swing_modes.append(SWING_BOTH)
+            self._attr_swing_modes.append(SWING_BOTH)
 
         # Fan Modes
         available_speeds = set()
         for mode_data in rac_config.get("racOperationModes", []):
-             enable_fan = mode_data.get("enableFanSpeed", {})
-             for speed, enabled in enable_fan.items():
-                 if enabled:
-                     available_speeds.add(speed)
-        
+            enable_fan = mode_data.get("enableFanSpeed", {})
+            for speed, enabled in enable_fan.items():
+                if enabled:
+                    available_speeds.add(speed)
+
         if "LV1" in available_speeds:
-            self._attr_fan_modes.append(FAN_OFF)
+            self._attr_fan_modes.append("Silent")
         if "LV2" in available_speeds:
-             self._attr_fan_modes.append(FAN_LOW)
+            self._attr_fan_modes.append("Low")
         if "LV3" in available_speeds:
-             self._attr_fan_modes.append(FAN_MIDDLE)
+            self._attr_fan_modes.append("Medium")
         if "LV4" in available_speeds:
-             self._attr_fan_modes.append(FAN_MEDIUM)
+            self._attr_fan_modes.append("High")
         if "LV5" in available_speeds:
-             self._attr_fan_modes.append(FAN_HIGH)
+            self._attr_fan_modes.append("Turbo")
 
     @property
     def unique_id(self):
@@ -157,10 +149,10 @@ class AirCloudClimateEntity(ClimateEntity):
     def supported_features(self):
         support_flags = (ClimateEntityFeature.TARGET_TEMPERATURE | ClimateEntityFeature.FAN_MODE
                          | ClimateEntityFeature.TURN_ON | ClimateEntityFeature.TURN_OFF)
-        
+
         if len(self._attr_swing_modes) > 1:
-             support_flags |= ClimateEntityFeature.SWING_MODE
-             
+            support_flags |= ClimateEntityFeature.SWING_MODE
+
         return support_flags
 
     @property
@@ -221,15 +213,15 @@ class AirCloudClimateEntity(ClimateEntity):
         if self._fan_speed == "AUTO":
             return FAN_AUTO
         elif self._fan_speed == "LV1":
-            return FAN_OFF
+            return "Silent"
         elif self._fan_speed == "LV2":
-            return FAN_LOW
+            return "Low"
         elif self._fan_speed == "LV3":
-            return FAN_MIDDLE
+            return "Medium"
         elif self._fan_speed == "LV4":
-            return FAN_MEDIUM
+            return "High"
         elif self._fan_speed == "LV5":
-            return FAN_HIGH
+            return "Turbo"
         else:
             return FAN_AUTO
 
@@ -315,15 +307,15 @@ class AirCloudClimateEntity(ClimateEntity):
 
         if fan_mode == FAN_AUTO:
             self._fan_speed = "AUTO"
-        elif fan_mode == FAN_OFF:
+        elif fan_mode == "Silent":
             self._fan_speed = "LV1"
-        elif fan_mode == FAN_LOW:
+        elif fan_mode == "Low":
             self._fan_speed = "LV2"
-        elif fan_mode == FAN_MIDDLE:
+        elif fan_mode == "Medium":
             self._fan_speed = "LV3"
-        elif fan_mode == FAN_MEDIUM:
+        elif fan_mode == "High":
             self._fan_speed = "LV4"
-        elif fan_mode == FAN_HIGH:
+        elif fan_mode == "Turbo":
             self._fan_speed = "LV5"
         else:
             self._fan_speed = "AUTO"
