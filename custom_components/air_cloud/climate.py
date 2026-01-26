@@ -14,13 +14,30 @@ NO_HUMIDITY_VALUE = 2147483647
 
 async def _async_setup(hass, async_add):
     api = hass.data[DOMAIN][API]
-    temp_adjust = hass.data[DOMAIN][CONF_TEMP_ADJUST]
-
+    
     family_ids = await api.load_family_ids()
+    
+    cloud_ids = []
+    all_devices = []
+
     for family_id in family_ids:
         family_devices = await api.load_climate_data(family_id)
         for device in family_devices:
-            async_add([AirCloudClimateEntity(api, device, hass, family_id)], update_before_add=False)
+            cloud_ids.append(device["cloudId"])
+            all_devices.append((device, family_id))
+
+    rac_config_map = {}
+    if cloud_ids:
+        rac_configs = await api.load_rac_configuration(cloud_ids)
+        rac_config_map = {config["cloudId"]: config for config in rac_configs}
+
+    entities = []
+    for device, family_id in all_devices:
+        rac_config = rac_config_map.get(device["cloudId"])
+        entities.append(AirCloudClimateEntity(api, device, hass, family_id, rac_config))
+        
+    if entities:
+        async_add(entities, update_before_add=False)
 
 
 async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
@@ -374,7 +391,7 @@ class AirCloudClimateEntity(ClimateEntity):
     def __update_data(self, climate_data):
         self._power = climate_data["power"]
         self._mode = climate_data["mode"]
-        if climate_data["mode"] == "AUTO":
+        if climate_data["mode"] == "AUTO" and self._power == "ON":
             self._target_temp = climate_data["iduTemperature"] + 25
         else:
             self._target_temp = climate_data["iduTemperature"]
