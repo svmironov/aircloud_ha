@@ -99,9 +99,12 @@ class AirCloudClimateEntity(ClimateEntity):
         # HVAC Modes
         for mode_data in rac_config.get("racOperationModes", []):
             mode = mode_data.get("mode")
+            reference = mode_data.get("referenceTemperature", 0.0)
+            min_temp = mode_data.get("minTemperature", 16.0)
+            max_temp = mode_data.get("maxTemperature", 32.0)
             self._temp_limits[mode] = {
-                "min": mode_data.get("minTemperature", 16.0),
-                "max": mode_data.get("maxTemperature", 32.0)
+                "min": min_temp + reference,
+                "max": max_temp + reference
             }
             if mode == "COOLING":
                 self._attr_hvac_modes.append(HVACMode.COOL)
