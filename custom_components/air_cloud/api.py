@@ -6,7 +6,17 @@ import uuid
 from datetime import datetime
 from aiohttp import WSMsgType
 
-from .const import HOST_API, URN_AUTH, URN_WHO, URN_WSS, URN_CONTROL, URN_REFRESH_TOKEN, URN_ENERGY_CONSUMPTION_SUMMARY, URN_RAC_CONFIGURATION, USER_AGENT
+from .const import (
+    HOST_API,
+    URN_AUTH,
+    URN_CONTROL,
+    URN_ENERGY_CONSUMPTION_SUMMARY,
+    URN_RAC_CONFIGURATION,
+    URN_REFRESH_TOKEN,
+    URN_WHO,
+    URN_WSS,
+    USER_AGENT,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -27,13 +37,26 @@ class AirCloudApi:
             await self.__authenticate()
             return True
         except Exception as e:
-            logging.error("Failed to validate credentials: %s", str(e))
+            _LOGGER.error("Failed to validate credentials: %s", str(e))
             return False
 
     async def __authenticate(self):
         authorization = {"email": self._login, "password": self._password}
-        async with self._session.post(HOST_API + URN_AUTH, json=authorization, headers={"User-Agent": USER_AGENT}) as response:
-            await self.__update_token_data(await response.json())
+
+        async with self._session.post(
+            HOST_API + URN_AUTH,
+            json=authorization,
+            headers={"User-Agent": USER_AGENT},
+        ) as response:
+            response_text = await response.text()
+            _LOGGER.debug(
+                "air_cloud.api: auth status=%s body=%s",
+                response.status,
+                response_text[:500],
+            )
+            response.raise_for_status()
+            await self.__update_token_data(json.loads(response_text))
+
         self._last_token_update = datetime.now()
 
     async def __refresh_token(self, forced=False):
@@ -46,11 +69,20 @@ class AirCloudApi:
         elif td_minutes[1] > 5:
             async with self._session.post(
                 HOST_API + URN_REFRESH_TOKEN,
-                headers={"Authorization": f"Bearer {self._ref_token}",
-                         "isRefreshToken": "true",
-                         "User-Agent": USER_AGENT}
+                headers={
+                    "Authorization": f"Bearer {self._ref_token}",
+                    "isRefreshToken": "true",
+                    "User-Agent": USER_AGENT,
+                },
             ) as response:
-                await self.__update_token_data(await response.json())
+                response_text = await response.text()
+                _LOGGER.debug(
+                    "air_cloud.api: refresh status=%s body=%s",
+                    response.status,
+                    response_text[:500],
+                )
+                response.raise_for_status()
+                await self.__update_token_data(json.loads(response_text))
             self._last_token_update = now_datetime
 
     async def __update_token_data(self, response):
@@ -61,37 +93,62 @@ class AirCloudApi:
         await self.__refresh_token()
         async with self._session.get(
             HOST_API + URN_WHO,
-            headers=self.__create_headers()
+            headers=self.__create_headers(),
         ) as response:
-            response_data = await response.json()
-            family_ids = [item["familyId"] for item in response_data]
-            return family_ids
+            response_text = await response.text()
+            _LOGGER.debug(
+                "air_cloud.api: who status=%s body=%s",
+                response.status,
+                response_text[:1000],
+            )
+            response.raise_for_status()
+            response_data = json.loads(response_text)
+            return [item["familyId"] for item in response_data]
 
     async def load_energy_consumption_summary(self, family_id):
         await self.__refresh_token()
         async with self._session.post(
             f"{HOST_API}{URN_ENERGY_CONSUMPTION_SUMMARY}?familyId={family_id}",
             headers=self.__create_headers(),
-            json={"from": "2000-01-01", "to": "2099-12-31"}
+            json={"from": "2000-01-01", "to": "2099-12-31"},
         ) as response:
-            return await response.json()
+            response_text = await response.text()
+            _LOGGER.debug(
+                "air_cloud.api: energy status=%s family_id=%s body=%s",
+                response.status,
+                family_id,
+                response_text[:1000],
+            )
+            response.raise_for_status()
+            return json.loads(response_text)
 
     async def load_rac_configuration(self, cloud_ids):
         await self.__refresh_token()
         async with self._session.post(
             HOST_API + URN_RAC_CONFIGURATION,
             headers=self.__create_headers(),
-            json=cloud_ids
+            json=cloud_ids,
         ) as response:
-            return await response.json()
+            response_text = await response.text()
+            _LOGGER.debug(
+                "air_cloud.api: rac config status=%s cloud_ids=%s body=%s",
+                response.status,
+                cloud_ids,
+                response_text[:1000],
+            )
+            response.raise_for_status()
+            return json.loads(response_text)
 
     async def load_climate_data(self, family_id):
         if self._session.closed:
+            _LOGGER.debug("air_cloud.api: sessão fechada em load_climate_data")
             return []
+
         await self.__refresh_token()
 
-        # Открываем новое соединение
-        async with self._session.ws_connect(URN_WSS, timeout=60, headers={"User-Agent": USER_AGENT}) as ws:
+        async with self._session.ws_connect(
+            URN_WSS, timeout=60, headers={"User-Agent": USER_AGENT}
+        ) as ws:
             connection_string = (
                 "CONNECT\naccept-version:1.1,1.2\nheart-beat:10000,10000\n"
                 "Authorization:Bearer {}\n\n\0\n"
@@ -100,8 +157,9 @@ class AirCloudApi:
                 self._token,
                 str(uuid.uuid4()),
                 str(family_id),
-                str(family_id)
+                str(family_id),
             )
+
             await ws.send_str(connection_string)
 
             try:
@@ -114,13 +172,15 @@ class AirCloudApi:
                     msg = await asyncio.wait_for(ws.receive(), timeout=10)
 
                     if msg.type == WSMsgType.TEXT:
-
                         if msg.data.startswith("CONNECTED") and "user-name:" not in msg.data:
-                            _LOGGER.warning("Websocket connection failed. Re-authenticating.")
                             await ws.close()
 
                             await self.__refresh_token(forced=True)
-                            ws = await self._session.ws_connect(URN_WSS, timeout=60, headers={"User-Agent": USER_AGENT})
+                            ws = await self._session.ws_connect(
+                                URN_WSS,
+                                timeout=60,
+                                headers={"User-Agent": USER_AGENT},
+                            )
                             connection_string = (
                                 "CONNECT\naccept-version:1.1,1.2\nheart-beat:10000,10000\n"
                                 "Authorization:Bearer {}\n\n\0\n"
@@ -129,7 +189,7 @@ class AirCloudApi:
                                 self._token,
                                 str(uuid.uuid4()),
                                 str(family_id),
-                                str(family_id)
+                                str(family_id),
                             )
                             await ws.send_str(connection_string)
                             attempt = 0
@@ -140,20 +200,17 @@ class AirCloudApi:
                             break
 
                     elif msg.type == WSMsgType.CLOSED:
-                        _LOGGER.warning("WebSocket connection is closed.")
                         return None
+
                 else:
-                    _LOGGER.warning("Unable to find '{' symbol after %d attempts", max_attempts)
                     await ws.close()
                     return None
 
             except asyncio.TimeoutError:
-                _LOGGER.warning("WebSocket connection timed out while receiving data")
                 await ws.close()
                 return None
 
         if not response:
-            _LOGGER.warning("No valid response received from WebSocket.")
             return None
 
         _LOGGER.debug("AirCloud climate data: %s", response)
@@ -163,36 +220,50 @@ class AirCloudApi:
 
     async def execute_command(self, id, family_id, power, temperature, mode, fan_speed, fan_swing, humidity):
         if self._session.closed:
+            _LOGGER.debug("air_cloud.api: sessão fechada em execute_command")
             return
+
         await self.__refresh_token()
+
         if mode == "AUTO":
             command = {
-            "power": power,
-            "relativeTemperature": temperature,
-            "mode": mode,
-            "fanSpeed": fan_speed,
-            "fanSwing": fan_swing,
-            "humidity": humidity
+                "power": power,
+                "relativeTemperature": temperature,
+                "mode": mode,
+                "fanSpeed": fan_speed,
+                "fanSwing": fan_swing,
             }
         else:
             command = {
-            "power": power,
-            "iduTemperature": temperature,
-            "mode": mode,
-            "fanSpeed": fan_speed,
-            "fanSwing": fan_swing,
-            "humidity": humidity
+                "power": power,
+                "iduTemperature": temperature,
+                "mode": mode,
+                "fanSpeed": fan_speed,
+                "fanSwing": fan_swing,
             }
+
+        url = f"{HOST_API}{URN_CONTROL}/{id}?familyId={family_id}"
+
+        _LOGGER.debug("air_cloud.api: PUT %s payload=%s", url, command)
+
         async with self._session.put(
-            f"{HOST_API}{URN_CONTROL}/{id}?familyId={family_id}",
+            url,
             headers=self.__create_headers(),
-            json=command
+            json=command,
         ) as response:
-            _LOGGER.debug("AirCloud command request: %s", command)
-            _LOGGER.debug("AirCloud command response: %s", await response.text())
+            response_text = await response.text()
+            _LOGGER.debug(
+                "air_cloud.api: command status=%s body=%s",
+                response.status,
+                response_text[:1000],
+            )
+            response.raise_for_status()
 
     def __create_headers(self):
-        return {"Authorization": f"Bearer {self._token}", "User-Agent": USER_AGENT}
+        return {
+            "Authorization": f"Bearer {self._token}",
+            "User-Agent": USER_AGENT,
+        }
 
     async def close_session(self):
         await self._session.close()
