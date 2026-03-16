@@ -14,7 +14,6 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     entities = []
     family_ids = await api.load_family_ids()
     for family_id in family_ids:
-        # Initial fetch to discover devices
         data = await api.load_energy_consumption_summary(family_id)
         if "individualRacsData" in data:
             for rac_data in data["individualRacsData"]:

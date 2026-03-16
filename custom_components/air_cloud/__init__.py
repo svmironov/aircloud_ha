@@ -1,63 +1,76 @@
-from homeassistant.config_entries import SOURCE_IMPORT, ConfigEntry
-from homeassistant.core import HomeAssistant
+from __future__ import annotations
 
-from .const import (DOMAIN, PLATFORM_CLIMATE, PLATFORM_NUMBER, PLATFORM_SENSOR, API, CONF_EMAIL, CONF_PASSWORD,
-                    CONF_TEMP_ADJUST, CONF_TEMP_STEP, SERVICE_EXEC_COMMAND, SERVICE_EXEC_COMMAND_DATA_SCHEMA,
-                    ARG_ID, ARG_FAMILY_ID, ARG_POWER, ARG_TARGET_TEMP, ARG_MODE,
-                    ARG_FAN_SPEED, ARG_FAN_SWING, ARG_HUMIDITY)
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant, ServiceCall
+
 from .api import AirCloudApi
+from .const import (
+    API,
+    ARG_FAMILY_ID,
+    ARG_FAN_SPEED,
+    ARG_FAN_SWING,
+    ARG_HUMIDITY,
+    ARG_ID,
+    ARG_MODE,
+    ARG_POWER,
+    ARG_TARGET_TEMP,
+    CONF_EMAIL,
+    CONF_PASSWORD,
+    CONF_TEMP_ADJUST,
+    CONF_TEMP_STEP,
+    DOMAIN,
+    PLATFORM_CLIMATE,
+    PLATFORM_NUMBER,
+    PLATFORM_SENSOR,
+    SERVICE_EXEC_COMMAND,
+    SERVICE_EXEC_COMMAND_DATA_SCHEMA,
+)
 
 PLATFORMS = [PLATFORM_CLIMATE, PLATFORM_NUMBER, PLATFORM_SENSOR]
 
-
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
-    login = entry.data.get(CONF_EMAIL)
-    password = entry.data.get(CONF_PASSWORD)
-
-    api = AirCloudApi(login, password)
-    hass.data[DOMAIN] = {API: api, CONF_TEMP_ADJUST: {}, CONF_TEMP_STEP: {}}
-
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    api = AirCloudApi(entry.data[CONF_EMAIL], entry.data[CONF_PASSWORD])
+    hass.data[DOMAIN] = {
+        API: api,
+        CONF_TEMP_ADJUST: {},
+        CONF_TEMP_STEP: {},
+    }
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-
     return True
 
-
-async def async_setup(hass: HomeAssistant, config: dict):
+async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     conf = config.get(DOMAIN)
-
     if conf:
-        login = config[DOMAIN].get(CONF_EMAIL)
-        password = config[DOMAIN].get(CONF_PASSWORD)
+        api = AirCloudApi(conf.get(CONF_EMAIL, ""), conf.get(CONF_PASSWORD, ""))
+        hass.data[DOMAIN] = {
+            API: api,
+            CONF_TEMP_ADJUST: {},
+            CONF_TEMP_STEP: {},
+        }
 
-        api = AirCloudApi(login, password)
-        hass.data[DOMAIN] = {API: api, CONF_TEMP_ADJUST: {}, CONF_TEMP_STEP: {}}
-
-    async def service_exec_command(service_call):
-        service_data = service_call.data
-        await hass.data[DOMAIN][API].execute_command(service_data[ARG_ID],
-                                                     service_data[ARG_FAMILY_ID],
-                                                     service_data[ARG_POWER],
-                                                     service_data[ARG_TARGET_TEMP],
-                                                     service_data[ARG_MODE],
-                                                     service_data[ARG_FAN_SPEED],
-                                                     service_data[ARG_FAN_SWING],
-                                                     service_data[ARG_HUMIDITY])
+    async def _service_exec_command(call: ServiceCall) -> None:
+        await hass.data[DOMAIN][API].execute_command(
+            call.data[ARG_ID],
+            call.data[ARG_FAMILY_ID],
+            call.data[ARG_POWER],
+            call.data[ARG_TARGET_TEMP],
+            call.data[ARG_MODE],
+            call.data[ARG_FAN_SPEED],
+            call.data[ARG_FAN_SWING],
+            call.data[ARG_HUMIDITY],
+        )
 
     hass.services.async_register(
         DOMAIN,
         SERVICE_EXEC_COMMAND,
-        service_exec_command,
+        _service_exec_command,
         schema=SERVICE_EXEC_COMMAND_DATA_SCHEMA,
     )
-
     return True
 
-
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
-
     if unload_ok:
         await hass.data[DOMAIN][API].close_session()
         hass.data.pop(DOMAIN)
-
     return unload_ok

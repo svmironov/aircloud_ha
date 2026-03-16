@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import asyncio
 import logging
+from typing import Any
 
 from homeassistant.components.climate import ClimateEntity
 from homeassistant.components.climate.const import (
@@ -8,429 +11,476 @@ from homeassistant.components.climate.const import (
     SWING_HORIZONTAL,
     SWING_OFF,
     SWING_VERTICAL,
+    ClimateEntityFeature,
+    HVACMode,
 )
-from homeassistant.components.climate.const import HVACMode, ClimateEntityFeature
 from homeassistant.const import ATTR_TEMPERATURE, UnitOfTemperature
 
-from .const import API, CONF_TEMP_ADJUST, CONF_TEMP_STEP, DOMAIN
+from .api import (
+    DEFAULT_FAN_SPEED,
+    DEFAULT_FAN_SWING,
+    DEFAULT_MODE,
+    DEFAULT_POWER,
+    FAN_SPEED_ORDER,
+    NO_HUMIDITY_VALUE,
+    _fan_sort_key,
+    _get_sys_type,
+    build_mode_settings_map,
+    get_supported_swing_values,
+)
+from .const import (
+    API,
+    CONF_TEMP_ADJUST,
+    CONF_TEMP_STEP,
+    DOMAIN,
+    SYS_TYPE_G_RAC,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
-NO_HUMIDITY_VALUE = 2147483647
+RAW_TO_HVAC: dict[str, HVACMode] = {
+    "COOLING": HVACMode.COOL,
+    "HEATING": HVACMode.HEAT,
+    "DRY":     HVACMode.DRY,
+    "FAN":     HVACMode.FAN_ONLY,
+    "AUTO":    HVACMode.AUTO,
+}
+HVAC_TO_RAW: dict[HVACMode, str] = {v: k for k, v in RAW_TO_HVAC.items()}
 
+RAW_TO_FAN: dict[str, str] = {
+    "AUTO": FAN_AUTO,
+    "LV1":  "Silent",
+    "LV2":  "Low",
+    "LV3":  "Medium",
+    "LV4":  "High",
+    "LV5":  "Turbo",
+    "LV6":  "Turbo+",
+    "LVA":  "Low-Auto",
+    "NOWIND": "No Wind",
+}
+FAN_TO_RAW: dict[str, str] = {v: k for k, v in RAW_TO_FAN.items()}
 
-async def _async_setup(hass, async_add):
+RAW_TO_SWING: dict[str, str] = {
+    "OFF":        SWING_OFF,
+    "VERTICAL":   SWING_VERTICAL,
+    "HORIZONTAL": SWING_HORIZONTAL,
+    "BOTH":       SWING_BOTH,
+}
+SWING_TO_RAW: dict[str, str] = {v: k for k, v in RAW_TO_SWING.items()}
+
+async def _build_entities(hass) -> list["AirCloudClimateEntity"]:
     api = hass.data[DOMAIN][API]
-
+    entities: list[AirCloudClimateEntity] = []
     family_ids = await api.load_family_ids()
-
-    cloud_ids = []
-    all_devices = []
-
+    all_devices: list[tuple[dict, int]] = []
+    cloud_ids: list[str] = []
     for family_id in family_ids:
-        family_devices = await api.load_climate_data(family_id) or []
-        for device in family_devices:
-            cloud_ids.append(device["cloudId"])
+        devices = await api.load_climate_data(family_id)
+        for device in devices:
             all_devices.append((device, family_id))
-
-    rac_config_map = {}
+            cid = device.get("cloudId")
+            if cid:
+                cloud_ids.append(cid)
     if cloud_ids:
-        rac_configs = await api.load_rac_configuration(cloud_ids)
-        rac_config_map = {config["cloudId"]: config for config in rac_configs}
-
-    entities = []
+        await api.load_rac_configuration(cloud_ids)
     for device, family_id in all_devices:
-        rac_config = rac_config_map.get(device["cloudId"])
-        entities.append(
-            AirCloudClimateEntity(api, device, hass, family_id, rac_config)
-        )
-
-    if entities:
-        async_add(entities, update_before_add=False)
-
+        rac_config = api.get_cached_rac_config(device.get("cloudId"))
+        entities.append(AirCloudClimateEntity(api, device, hass, family_id, rac_config))
+    return entities
 
 async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
-    await _async_setup(hass, async_add_entities)
-
-
-async def async_setup_entry(hass, config_entry, async_add_devices):
-    api = hass.data[DOMAIN][API]
-    entities = []
-    family_ids = await api.load_family_ids()
-
-    cloud_ids = []
-    all_devices = []
-
-    for family_id in family_ids:
-        family_devices = await api.load_climate_data(family_id) or []
-        for device in family_devices:
-            cloud_ids.append(device["cloudId"])
-            all_devices.append((device, family_id))
-
-    rac_config_map = {}
-    if cloud_ids:
-        rac_configs = await api.load_rac_configuration(cloud_ids)
-        rac_config_map = {config["cloudId"]: config for config in rac_configs}
-
-    for device, family_id in all_devices:
-        rac_config = rac_config_map.get(device["cloudId"])
-        entities.append(AirCloudClimateEntity(api, device, hass, family_id, rac_config))
-
+    entities = await _build_entities(hass)
     if entities:
-        async_add_devices(entities)
+        async_add_entities(entities, update_before_add=False)
 
+async def async_setup_entry(hass, config_entry, async_add_entities):
+    entities = await _build_entities(hass)
+    if entities:
+        async_add_entities(entities, update_before_add=False)
 
 class AirCloudClimateEntity(ClimateEntity):
-    _enable_turn_on_off_backwards_compatibility = False
-    _attr_has_entity_name = True
 
-    def __init__(self, api, device, hass, family_id, rac_config):
-        self._target_temp = 0
+    _attr_has_entity_name = True
+    _enable_turn_on_off_backwards_compatibility = False
+
+    def __init__(
+        self,
+        api,
+        device: dict[str, Any],
+        hass,
+        family_id: int,
+        rac_config: dict[str, Any] | None,
+    ) -> None:
         self._api = api
         self._hass = hass
-        self._id = device["id"]
-        self._name = device["name"]
-        self._vendor_id = device["vendorThingId"]
-        self._cloud_id = device["cloudId"]
-        self._update_lock = False
         self._family_id = family_id
-        self._temp_limits = {}
-        self.__update_data(device)
-        self._update_capabilities(rac_config)
+        self._device_id: int = device["id"]
+        self._vendor_id: str = device["vendorThingId"]
+        self._cloud_id: str | None = device.get("cloudId")
+        self._rac_config = rac_config
+        self._mode_settings: dict[str, Any] = build_mode_settings_map(rac_config)
+        self._supported_raw_swings: list[str] = get_supported_swing_values(rac_config)
 
-    def _update_capabilities(self, rac_config):
-        self._attr_hvac_modes = [HVACMode.OFF]
-        self._attr_fan_modes = [FAN_AUTO]
-        self._attr_swing_modes = [SWING_OFF]
+        self._attr_unique_id = self._vendor_id
+        self._attr_name: str = device["name"]
 
-        if not rac_config:
-            return
+        self._available = True
+        self._power = DEFAULT_POWER
+        self._mode = DEFAULT_MODE
+        self._fan_speed = DEFAULT_FAN_SPEED
+        self._fan_swing = DEFAULT_FAN_SWING
+        self._target_temp: float = 24.0
+        self._room_temp: float | None = None
+        self._raw_humidity: Any = NO_HUMIDITY_VALUE
+        self._sys_type: int | None = None
+        self._command_in_flight = False
 
-        for mode_data in rac_config.get("racOperationModes", []):
-            mode = mode_data.get("mode")
-            reference = mode_data.get("referenceTemperature", 0.0)
-            min_temp = mode_data.get("minTemperature", 16.0)
-            max_temp = mode_data.get("maxTemperature", 32.0)
-            self._temp_limits[mode] = {
-                "min": min_temp + reference,
-                "max": max_temp + reference,
-            }
+        self._apply_snapshot(device)
 
-            if mode == "COOLING":
-                self._attr_hvac_modes.append(HVACMode.COOL)
-            elif mode == "HEATING":
-                self._attr_hvac_modes.append(HVACMode.HEAT)
-            elif mode == "DRY":
-                self._attr_hvac_modes.append(HVACMode.DRY)
-            elif mode == "FAN":
-                self._attr_hvac_modes.append(HVACMode.FAN_ONLY)
-            elif mode == "AUTO":
-                self._attr_hvac_modes.append(HVACMode.AUTO)
+        self._attr_hvac_modes = self._build_hvac_modes()
+        self._attr_fan_modes = self._build_fan_modes()
+        self._attr_swing_modes = self._build_swing_modes()
 
-        swing_config = rac_config.get("swing", {})
-        vertical = swing_config.get("VERTICAL", False)
-        horizontal = swing_config.get("HORIZONTAL", False)
+    def _build_hvac_modes(self) -> list[HVACMode]:
+        modes = [HVACMode.OFF]
+        raw_modes = list(self._mode_settings) or [self._mode]
+        for raw in RAW_TO_HVAC:
+            if raw in raw_modes and RAW_TO_HVAC[raw] not in modes:
+                modes.append(RAW_TO_HVAC[raw])
+        return modes
 
-        if vertical:
-            self._attr_swing_modes.append(SWING_VERTICAL)
-        if horizontal:
-            self._attr_swing_modes.append(SWING_HORIZONTAL)
-        if vertical and horizontal:
-            self._attr_swing_modes.append(SWING_BOTH)
+    def _build_fan_modes(self) -> list[str]:
+        all_speeds: set[str] = set()
+        for settings in self._mode_settings.values():
+            all_speeds.update(settings.get("enabled_fan_speeds") or [])
+        if not all_speeds:
+            all_speeds = {self._fan_speed}
+        ordered = [
+            RAW_TO_FAN[s]
+            for s in FAN_SPEED_ORDER
+            if s in all_speeds and s in RAW_TO_FAN
+        ]
+        return ordered or [FAN_AUTO]
 
-        available_speeds = set()
-        for mode_data in rac_config.get("racOperationModes", []):
-            enable_fan = mode_data.get("enableFanSpeed", {})
-            for speed, enabled in enable_fan.items():
-                if enabled:
-                    available_speeds.add(speed)
+    def _build_swing_modes(self) -> list[str]:
+        modes = [SWING_OFF]
+        for raw in ("VERTICAL", "HORIZONTAL", "BOTH"):
+            if raw in self._supported_raw_swings and RAW_TO_SWING.get(raw) not in modes:
+                modes.append(RAW_TO_SWING[raw])
+        return modes
 
-        if "LV1" in available_speeds:
-            self._attr_fan_modes.append("Silent")
-        if "LV2" in available_speeds:
-            self._attr_fan_modes.append("Low")
-        if "LV3" in available_speeds:
-            self._attr_fan_modes.append("Medium")
-        if "LV4" in available_speeds:
-            self._attr_fan_modes.append("High")
-        if "LV5" in available_speeds:
-            self._attr_fan_modes.append("Turbo")
+    def _apply_snapshot(self, snapshot: dict[str, Any]) -> None:
+        self._available = bool(
+            snapshot.get("online", snapshot.get("isOnline", True))
+        )
+        self._power = str(snapshot.get("power", self._power)).upper()
+        self._mode = str(snapshot.get("mode", self._mode)).upper()
+        self._fan_speed = str(snapshot.get("fanSpeed", self._fan_speed)).upper()
+        self._fan_swing = str(snapshot.get("fanSwing", self._fan_swing)).upper()
+        self._sys_type = _get_sys_type(snapshot)
+
+        settings = self._mode_settings_for(self._mode)
+        is_relative = settings.get("temperature_setting", "ABSOLUTE") == "RELATIVE"
+        ref_temp = float(settings.get("reference_temperature", 0.0))
+
+        if is_relative and snapshot.get("relativeTemperature") not in (None, ""):
+            raw_t = float(snapshot.get("relativeTemperature", 0.0))
+            self._target_temp = self._clamp_temp(raw_t + ref_temp, self._mode)
+        elif snapshot.get("iduTemperature") not in (None, ""):
+            raw_t = float(snapshot.get("iduTemperature", 24.0))
+            self._target_temp = self._clamp_temp(raw_t, self._mode)
+        else:
+            self._target_temp = self._default_temp(self._mode)
+
+        room_raw = snapshot.get("roomTemperature")
+        if room_raw is not None:
+            adjust = float(
+                self._hass.data.get(DOMAIN, {})
+                .get(CONF_TEMP_ADJUST, {})
+                .get(self._device_id, 0.0)
+            )
+            self._room_temp = float(room_raw) + adjust
+        else:
+            self._room_temp = None
+
+        self._raw_humidity = snapshot.get("humidity", NO_HUMIDITY_VALUE)
+
+    def _mode_settings_for(self, mode: str | None = None) -> dict[str, Any]:
+        key = str(mode or self._mode or DEFAULT_MODE).upper()
+        return self._mode_settings.get(key) or {}
+
+    def _default_temp(self, mode: str) -> float:
+        s = self._mode_settings_for(mode)
+        ref = float(s.get("reference_temperature", 0.0))
+        default = float(s.get("default_temperature", 24.0))
+        return default + ref
+
+    def _clamp_temp(self, value: float, mode: str) -> float:
+        s = self._mode_settings_for(mode)
+        ref = float(s.get("reference_temperature", 0.0))
+        lo = float(s.get("min_temperature", 16.0)) + ref
+        hi = float(s.get("max_temperature", 32.0)) + ref
+        if lo >= hi:
+            return value
+        return max(lo, min(hi, value))
+
+    def _normalize_fan_speed(self, raw_speed: str | None, mode: str) -> str:
+        s = self._mode_settings_for(mode)
+        enabled: list[str] = s.get("enabled_fan_speeds") or []
+        candidate = str(raw_speed or self._fan_speed or DEFAULT_FAN_SPEED).upper()
+        if not enabled or not s.get("fan_enabled", True):
+            return candidate
+        if candidate in enabled:
+            return candidate
+        default = s.get("default_fan_speed", DEFAULT_FAN_SPEED)
+        return default if default in enabled else sorted(enabled, key=_fan_sort_key)[0]
+
+    def _normalize_fan_swing(self, raw_swing: str | None) -> str:
+        candidate = str(raw_swing or self._fan_swing or DEFAULT_FAN_SWING).upper()
+        if candidate == "AUTO" and self._sys_type == SYS_TYPE_G_RAC:
+            candidate = DEFAULT_FAN_SWING
+        if not self._supported_raw_swings:
+            return candidate
+        if candidate in self._supported_raw_swings:
+            return candidate
+        current = str(self._fan_swing or DEFAULT_FAN_SWING).upper()
+        if current == "AUTO" and self._sys_type == SYS_TYPE_G_RAC:
+            current = DEFAULT_FAN_SWING
+        return current if current in self._supported_raw_swings else DEFAULT_FAN_SWING
+
+    def _command_humidity(self, mode: str) -> int:
+        s = self._mode_settings_for(mode)
+        default = int(s.get("default_humidity", 0))
+        if not s.get("humidity_enabled", False):
+            return default
+
+        raw = self._raw_humidity
+        try:
+            val = int(float(raw)) if raw not in (None, "", NO_HUMIDITY_VALUE) else NO_HUMIDITY_VALUE
+        except (TypeError, ValueError):
+            val = NO_HUMIDITY_VALUE
+
+        if val >= NO_HUMIDITY_VALUE:
+            return default
+
+        min_h = s.get("min_humidity")
+        max_h = s.get("max_humidity")
+        if min_h is not None and max_h is not None and min_h <= max_h:
+            if not (min_h <= val <= max_h):
+                return default
+        return val
+
+    async def _send_command(
+        self,
+        *,
+        power: str | None = None,
+        mode: str | None = None,
+        target_temp: float | None = None,
+        fan_speed: str | None = None,
+        fan_swing: str | None = None,
+    ) -> None:
+        desired_mode = str(mode or self._mode or DEFAULT_MODE).upper()
+        desired_power = (
+            "ON" if str(power or self._power or DEFAULT_POWER).upper() == "ON" else "OFF"
+        )
+        desired_temp = self._clamp_temp(
+            target_temp if target_temp is not None else self._target_temp,
+            desired_mode,
+        )
+        desired_fan = self._normalize_fan_speed(fan_speed, desired_mode)
+        desired_swing = self._normalize_fan_swing(fan_swing)
+        desired_humidity = self._command_humidity(desired_mode)
+
+        _LOGGER.debug(
+            "AirCloud: sending command device=%s power=%s mode=%s temp=%.1f fan=%s swing=%s hum=%s",
+            self._device_id, desired_power, desired_mode, desired_temp,
+            desired_fan, desired_swing, desired_humidity,
+        )
+
+        self._command_in_flight = True
+        try:
+            await self._api.execute_command(
+                self._device_id,
+                self._family_id,
+                desired_power,
+                desired_temp,
+                desired_mode,
+                desired_fan,
+                desired_swing,
+                desired_humidity,
+            )
+        except Exception as exc: 
+            _LOGGER.error("AirCloud: command failed: %s", exc)
+        finally:
+            self._command_in_flight = False
+
+        self._power = desired_power
+        self._mode = desired_mode
+        self._target_temp = desired_temp
+        self._fan_speed = desired_fan
+        self._fan_swing = desired_swing
+        self.async_write_ha_state()
+
+        await asyncio.sleep(2)
+        devices = await self._api.load_climate_data(self._family_id, force=True)
+        for device in devices:
+            if device.get("id") == self._device_id:
+                self._apply_snapshot(device)
+                break
+        self.async_write_ha_state()
 
     @property
-    def unique_id(self):
-        return self._vendor_id
+    def unique_id(self) -> str:
+        return self._attr_unique_id
 
     @property
-    def device_info(self):
+    def name(self) -> str:
+        return self._attr_name
+
+    @property
+    def device_info(self) -> dict:
         return {
             "identifiers": {(DOMAIN, self._vendor_id)},
-            "name": self._name,
+            "name": self._attr_name,
             "manufacturer": "Hitachi",
             "model": "AirCloud Climate",
         }
 
     @property
-    def extra_state_attributes(self):
+    def available(self) -> bool:
+        return self._available
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
         return {
             "family_id": self._family_id,
-            "air_cloud_id": self._id,
+            "air_cloud_id": self._device_id,
             "cloud_id": self._cloud_id,
+            "sys_type": self._sys_type,
         }
 
     @property
-    def supported_features(self):
-        support_flags = (
-            ClimateEntityFeature.TARGET_TEMPERATURE
-            | ClimateEntityFeature.FAN_MODE
-            | ClimateEntityFeature.TURN_ON
-            | ClimateEntityFeature.TURN_OFF
-        )
-
-        if len(self._attr_swing_modes) > 1:
-            support_flags |= ClimateEntityFeature.SWING_MODE
-
-        return support_flags
+    def supported_features(self) -> ClimateEntityFeature:
+        features = ClimateEntityFeature.TURN_ON | ClimateEntityFeature.TURN_OFF
+        if not self._mode_settings or any(
+            s.get("temperature_enabled", True) for s in self._mode_settings.values()
+        ):
+            features |= ClimateEntityFeature.TARGET_TEMPERATURE
+        if len(self._attr_fan_modes or []) > 1:
+            features |= ClimateEntityFeature.FAN_MODE
+        if len(self._attr_swing_modes or []) > 1:
+            features |= ClimateEntityFeature.SWING_MODE
+        return features
 
     @property
-    def temperature_unit(self):
+    def temperature_unit(self) -> str:
         return UnitOfTemperature.CELSIUS
 
     @property
-    def current_temperature(self):
+    def current_temperature(self) -> float | None:
         return self._room_temp
 
     @property
-    def target_temperature(self):
+    def target_temperature(self) -> float:
         return self._target_temp
 
     @property
-    def target_temperature_step(self):
-        step_data = self._hass.data.get(DOMAIN, {}).get(CONF_TEMP_STEP, {})
-        step = step_data.get(self._id)
-        if step is None:
-            return 0.5
-        return step
+    def target_temperature_step(self) -> float:
+        return float(
+            self._hass.data.get(DOMAIN, {})
+            .get(CONF_TEMP_STEP, {})
+            .get(self._device_id, 0.5)
+        )
 
     @property
-    def max_temp(self):
-        return self._temp_limits.get(self._mode, {}).get("max", 32.0)
+    def min_temp(self) -> float:
+        s = self._mode_settings_for(self._mode)
+        ref = float(s.get("reference_temperature", 0.0))
+        return float(s.get("min_temperature", 16.0)) + ref
 
     @property
-    def min_temp(self):
-        return self._temp_limits.get(self._mode, {}).get("min", 16.0)
+    def max_temp(self) -> float:
+        s = self._mode_settings_for(self._mode)
+        ref = float(s.get("reference_temperature", 0.0))
+        return float(s.get("max_temperature", 32.0)) + ref
 
     @property
-    def name(self):
-        return self._name
-
-    @property
-    def hvac_mode(self):
+    def hvac_mode(self) -> HVACMode:
         if self._power == "OFF":
             return HVACMode.OFF
-        elif self._mode == "COOLING":
-            return HVACMode.COOL
-        elif self._mode == "HEATING":
-            return HVACMode.HEAT
-        elif self._mode == "FAN":
-            return HVACMode.FAN_ONLY
-        elif self._mode == "DRY":
-            return HVACMode.DRY
-        elif self._mode == "AUTO":
-            return HVACMode.AUTO
-        return HVACMode.OFF
+        return RAW_TO_HVAC.get(self._mode, HVACMode.OFF)
 
     @property
-    def hvac_modes(self):
+    def hvac_modes(self) -> list[HVACMode]:
         return self._attr_hvac_modes
 
     @property
-    def fan_mode(self):
-        if self._fan_speed == "AUTO":
-            return FAN_AUTO
-        elif self._fan_speed == "LV1":
-            return "Silent"
-        elif self._fan_speed == "LV2":
-            return "Low"
-        elif self._fan_speed == "LV3":
-            return "Medium"
-        elif self._fan_speed == "LV4":
-            return "High"
-        elif self._fan_speed == "LV5":
-            return "Turbo"
-        return FAN_AUTO
+    def fan_mode(self) -> str:
+        return RAW_TO_FAN.get(self._fan_speed, FAN_AUTO)
 
     @property
-    def fan_modes(self):
+    def fan_modes(self) -> list[str]:
         return self._attr_fan_modes
 
     @property
-    def swing_mode(self):
-        if self._fan_swing == "VERTICAL":
-            return SWING_VERTICAL
-        elif self._fan_swing == "HORIZONTAL":
-            return SWING_HORIZONTAL
-        elif self._fan_swing == "BOTH":
-            return SWING_BOTH
-        return SWING_OFF
+    def swing_mode(self) -> str:
+        return RAW_TO_SWING.get(self._fan_swing, SWING_OFF)
 
     @property
-    def swing_modes(self):
+    def swing_modes(self) -> list[str]:
         return self._attr_swing_modes
 
-    async def async_turn_on(self):
-        self._update_lock = True
-        self._power = "ON"
-        await self.__execute_command()
+    async def async_turn_on(self) -> None:
+        await self._send_command(power="ON")
 
-    async def async_turn_off(self):
-        self._update_lock = True
-        self._power = "OFF"
-        await self.__execute_command()
+    async def async_turn_off(self) -> None:
+        await self._send_command(power="OFF")
 
-    async def async_set_hvac_mode(self, hvac_mode):
-        self._update_lock = True
-
-        if hvac_mode != HVACMode.OFF:
-            self._power = "ON"
-
+    async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
         if hvac_mode == HVACMode.OFF:
-            self._power = "OFF"
-        elif hvac_mode == HVACMode.COOL:
-            self._mode = "COOLING"
-        elif hvac_mode == HVACMode.DRY:
-            self._mode = "DRY"
-        elif hvac_mode == HVACMode.FAN_ONLY:
-            self._mode = "FAN"
-        elif hvac_mode == HVACMode.AUTO:
-            self._mode = "AUTO"
-        elif hvac_mode == HVACMode.HEAT:
-            self._mode = "HEATING"
-        else:
-            self._power = "OFF"
-
-        await self.__execute_command()
-
-    async def async_set_fan_mode(self, fan_mode):
-        self._update_lock = True
-
-        if fan_mode == FAN_AUTO:
-            self._fan_speed = "AUTO"
-        elif fan_mode == "Silent":
-            self._fan_speed = "LV1"
-        elif fan_mode == "Low":
-            self._fan_speed = "LV2"
-        elif fan_mode == "Medium":
-            self._fan_speed = "LV3"
-        elif fan_mode == "High":
-            self._fan_speed = "LV4"
-        elif fan_mode == "Turbo":
-            self._fan_speed = "LV5"
-        else:
-            self._fan_speed = "AUTO"
-
-        await self.__execute_command()
-
-    async def async_set_swing_mode(self, swing_mode):
-        self._update_lock = True
-
-        if swing_mode == SWING_VERTICAL:
-            self._fan_swing = "VERTICAL"
-        elif swing_mode == SWING_HORIZONTAL:
-            self._fan_swing = "HORIZONTAL"
-        elif swing_mode == SWING_BOTH:
-            self._fan_swing = "BOTH"
-        else:
-            self._fan_swing = "OFF"
-
-        await self.__execute_command()
-
-    async def async_set_temperature(self, **kwargs):
-        self._update_lock = True
-
-        target_temp = kwargs.get(ATTR_TEMPERATURE)
-        if target_temp is None:
-            self._update_lock = False
+            await self._send_command(power="OFF")
             return
-
-        self._target_temp = target_temp
-        await self.__execute_command()
-
-    async def async_update(self):
-        if self._update_lock is False:
-            try:
-                devices = await asyncio.wait_for(
-                    self._api.load_climate_data(self._family_id), timeout=10
-                )
-                for device in devices or []:
-                    if self._id == device["id"]:
-                        self.__update_data(device)
-                        _LOGGER.debug(
-                            "air_cloud: estado atualizado para %s | power=%s mode=%s target=%s room=%s",
-                            self._name,
-                            self._power,
-                            self._mode,
-                            self._target_temp,
-                            self._room_temp,
-                        )
-            except asyncio.TimeoutError:
-                _LOGGER.debug("air_cloud: timeout ao atualizar %s", self._name)
-
-    async def __execute_command(self):
-        target_temp = self._target_temp
-
-        if self._mode == "FAN":
-            target_temp = 0
-        elif self._mode == "AUTO":
-            target_temp = max(-3, min(3, target_temp - 25))
-
-        _LOGGER.debug(
-            "air_cloud: comando %s | power=%s temp=%s mode=%s fan=%s swing=%s",
-            self._name,
-            self._power,
-            target_temp,
-            self._mode,
-            self._fan_speed,
-            self._fan_swing,
+        raw_mode = HVAC_TO_RAW.get(hvac_mode, self._mode)
+        mode_changed = raw_mode != self._mode
+        await self._send_command(
+            power="ON",
+            mode=raw_mode,
+            target_temp=self._default_temp(raw_mode) if mode_changed else None,
+            fan_speed=(
+                self._mode_settings_for(raw_mode).get("default_fan_speed")
+                if mode_changed else None
+            ),
         )
 
-        await self._api.execute_command(
-            self._id,
-            self._family_id,
-            self._power,
-            target_temp,
-            self._mode,
-            self._fan_speed,
-            self._fan_swing,
-            self._humidity,
+    async def async_set_fan_mode(self, fan_mode: str) -> None:
+        raw = FAN_TO_RAW.get(fan_mode, DEFAULT_FAN_SPEED)
+        await self._send_command(fan_speed=raw)
+
+    async def async_set_swing_mode(self, swing_mode: str) -> None:
+        raw = SWING_TO_RAW.get(swing_mode, DEFAULT_FAN_SWING)
+        await self._send_command(fan_swing=raw)
+
+    async def async_set_temperature(self, **kwargs: Any) -> None:
+        temp = kwargs.get(ATTR_TEMPERATURE)
+        if temp is None:
+            return
+        hvac_mode = kwargs.get("hvac_mode")
+        if hvac_mode == HVACMode.OFF:
+            await self._send_command(power="OFF", target_temp=float(temp))
+            return
+        desired_mode = (
+            HVAC_TO_RAW.get(hvac_mode, self._mode)
+            if hvac_mode is not None
+            else self._mode
         )
+        desired_power = "ON" if hvac_mode is not None and hvac_mode != HVACMode.OFF else self._power
+        await self._send_command(power=desired_power, mode=desired_mode, target_temp=float(temp))
 
-        await asyncio.sleep(10)
-        self._update_lock = False
-        await self.async_update()
-
-    def __update_data(self, climate_data):
-        self._power = climate_data["power"]
-        self._mode = climate_data["mode"]
-
-        if climate_data["mode"] == "AUTO" and self._power == "ON":
-            self._target_temp = climate_data["iduTemperature"] + 25
-        else:
-            self._target_temp = climate_data["iduTemperature"]
-
-        adjust_data = self._hass.data.get(DOMAIN, {}).get(CONF_TEMP_ADJUST, {})
-        temp_adjust = adjust_data.get(self._id)
-        if temp_adjust is None:
-            temp_adjust = 0.0
-
-        self._room_temp = climate_data.get("roomTemperature")
-        if self._room_temp is not None:
-            self._room_temp = self._room_temp + temp_adjust
-
-        self._fan_speed = climate_data["fanSpeed"]
-        self._fan_swing = climate_data["fanSwing"]
-
-        self._humidity = climate_data.get("humidity", 0)
-        if self._humidity < NO_HUMIDITY_VALUE:
-            self._humidity = 50
-        elif self._humidity == NO_HUMIDITY_VALUE:
-            self._humidity = 0
+    async def async_update(self) -> None:
+        if self._command_in_flight:
+            return
+        devices = await self._api.load_climate_data(self._family_id)
+        for device in devices:
+            if device.get("id") == self._device_id:
+                self._apply_snapshot(device)
+                break

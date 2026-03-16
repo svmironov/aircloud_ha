@@ -3,7 +3,6 @@ import voluptuous as vol
 
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
 
-
 DOMAIN = "air_cloud"
 API = "api"
 PLATFORM_CLIMATE = "climate"
@@ -17,9 +16,15 @@ URN_AUTH = "iam/auth/sign-in"
 URN_REFRESH_TOKEN = "iam/auth/refresh-token"
 URN_WHO = "rac/location-controls/status"
 URN_CONTROL = "rac/basic-idu-control/general-control-command"
+URN_CONTROL_STATUS = "rac/basic-idu-control/general-control-command-status"
+URN_CONTROL_PAC_STATUS = "pac/basic-idu-control/general-control-command-pac-status"
+URN_CONTROL_YUTAMPO_STATUS = "rac/yutampo-system-control/system-control-command-status"
 URN_WSS = "wss://notification-global-prod.aircloudhome.com/rac-notifications/websocket"
 URN_ENERGY_CONSUMPTION_SUMMARY = "rac/energy-consumptions/summary/v3"
 URN_RAC_CONFIGURATION = "rac/model-wise/rac-configuration"
+SYS_TYPE_G_RAC = 1
+SYS_TYPE_G_PAC = 2
+SYS_TYPE_YUTAMPO = 3
 SERVICE_EXEC_COMMAND = "exec_command"
 ARG_ID = "id"
 ARG_FAMILY_ID = "family_id"
@@ -29,7 +34,6 @@ ARG_MODE = "mode"
 ARG_FAN_SPEED = "fan_speed"
 ARG_FAN_SWING = "fan_swing"
 ARG_HUMIDITY = "humidity"
-
 
 SERVICE_EXEC_COMMAND_DATA_SCHEMA = vol.Schema(
     {
