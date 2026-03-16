@@ -20,6 +20,7 @@ from .const import (
     URN_CONTROL_STATUS,
     URN_CONTROL_YUTAMPO_STATUS,
     URN_ENERGY_CONSUMPTION_SUMMARY,
+    URN_FROST_WASH,
     URN_RAC_CONFIGURATION,
     URN_REFRESH_TOKEN,
     URN_WHO,
@@ -366,6 +367,20 @@ class AirCloudApi:
         url = f"{HOST_API}{URN_CONTROL_YUTAMPO_STATUS}/{device_id}?familyId={family_id}"
         await self._put(url, payload)
         self._device_cache[device_id] = {**snapshot, **payload}
+
+    async def execute_frost_wash(self, device_id: int, family_id: int) -> None:
+        if self._session.closed:
+            return
+
+        await self._refresh_token()
+        snapshot = self._device_cache.get(device_id) or {}
+        
+        # The Android app sends the entire DetailedIduModel snapshot as payload
+        payload: dict[str, Any] = {**snapshot}
+        # The endpoint requires familyId in the query string
+        url = f"{HOST_API}{URN_FROST_WASH}/{device_id}?familyId={family_id}"
+        
+        await self._put(url, payload)
 
     async def _put(self, url: str, payload: dict[str, Any]) -> None:
         _LOGGER.debug("AirCloud: PUT %s  payload=%s", url, payload)
