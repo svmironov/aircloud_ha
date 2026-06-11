@@ -31,6 +31,8 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 NO_HUMIDITY_VALUE: int = 2_147_483_647
+ENERGY_SUMMARY_CACHE_SECONDS: float = 600.0
+ENERGY_SUMMARY_RATE_LIMIT_SECONDS: float = 1800.0
 
 DEFAULT_POWER = "OFF"
 DEFAULT_MODE = "COOLING"
@@ -65,15 +67,24 @@ class AirCloudApi:
         self._device_cache: dict[int, dict[str, Any]] = {}
         self._device_family: dict[int, int] = {}
         self._rac_config_cache: dict[str, dict[str, Any]] = {}
+        self._energy_summary_cache: dict[int, dict[str, Any]] = {}
+        self._energy_summary_timestamps: dict[int, float] = {}
+        self._energy_summary_rate_limited_until: dict[int, float] = {}
         self._session = aiohttp.ClientSession()
 
         self._update_locks: dict[int, asyncio.Lock] = {}
         self._update_timestamps: dict[int, float] = {}
+        self._energy_summary_locks: dict[int, asyncio.Lock] = {}
 
     def _get_update_lock(self, family_id: int) -> asyncio.Lock:
         if family_id not in self._update_locks:
             self._update_locks[family_id] = asyncio.Lock()
         return self._update_locks[family_id]
+
+    def _get_energy_summary_lock(self, family_id: int) -> asyncio.Lock:
+        if family_id not in self._energy_summary_locks:
+            self._energy_summary_locks[family_id] = asyncio.Lock()
+        return self._energy_summary_locks[family_id]
 
     async def validate_credentials(self) -> bool:
         try:
@@ -232,15 +243,68 @@ class AirCloudApi:
 
         return None
 
-    async def load_energy_consumption_summary(self, family_id: int) -> dict[str, Any]:
-        await self._refresh_token()
-        async with self._session.post(
-            f"{HOST_API}{URN_ENERGY_CONSUMPTION_SUMMARY}?familyId={family_id}",
-            headers=self._headers(),
-            json={"from": "2000-01-01", "to": "2099-12-31"},
-        ) as resp:
-            resp.raise_for_status()
-            return await resp.json(content_type=None)
+    async def load_energy_consumption_summary(
+        self,
+        family_id: int,
+        force: bool = False,
+    ) -> dict[str, Any]:
+        now = asyncio.get_running_loop().time()
+        cached = self._energy_summary_cache.get(family_id)
+        last_update = self._energy_summary_timestamps.get(family_id, 0.0)
+        rate_limited_until = self._energy_summary_rate_limited_until.get(family_id, 0.0)
+
+        if cached and not force:
+            if now < rate_limited_until or (now - last_update) < ENERGY_SUMMARY_CACHE_SECONDS:
+                return cached
+
+        lock = self._get_energy_summary_lock(family_id)
+        async with lock:
+            now = asyncio.get_running_loop().time()
+            cached = self._energy_summary_cache.get(family_id)
+            last_update = self._energy_summary_timestamps.get(family_id, 0.0)
+            rate_limited_until = self._energy_summary_rate_limited_until.get(family_id, 0.0)
+
+            if cached and not force:
+                if now < rate_limited_until or (now - last_update) < ENERGY_SUMMARY_CACHE_SECONDS:
+                    return cached
+
+            if self._session.closed:
+                return cached or {}
+
+            await self._refresh_token()
+
+            try:
+                async with self._session.post(
+                    f"{HOST_API}{URN_ENERGY_CONSUMPTION_SUMMARY}?familyId={family_id}",
+                    headers=self._headers(),
+                    json={"from": "2000-01-01", "to": "2099-12-31"},
+                ) as resp:
+                    if resp.status == 429:
+                        retry_after = _retry_after_seconds(resp.headers.get("Retry-After"))
+                        self._energy_summary_rate_limited_until[family_id] = (
+                            asyncio.get_running_loop().time() + retry_after
+                        )
+                        _LOGGER.warning(
+                            "AirCloud: energy summary rate limited for family %s, retrying in %.0f seconds",
+                            family_id,
+                            retry_after,
+                        )
+                        return cached or {}
+
+                    resp.raise_for_status()
+                    data = await resp.json(content_type=None)
+            except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
+                _LOGGER.warning(
+                    "AirCloud: failed to load energy summary for family %s: %s",
+                    family_id,
+                    exc,
+                )
+                return cached or {}
+
+            self._energy_summary_cache[family_id] = data
+            self._energy_summary_timestamps[family_id] = asyncio.get_running_loop().time()
+            self._energy_summary_rate_limited_until.pop(family_id, None)
+            return data
 
     async def load_rac_configuration(self, cloud_ids: list[str]) -> list[dict[str, Any]]:
         unique = list(dict.fromkeys(cid for cid in cloud_ids if cid))
@@ -411,6 +475,14 @@ def _get_sys_type(snapshot: dict[str, Any]) -> int | None:
         return int(val)
     except (TypeError, ValueError):
         return None
+
+def _retry_after_seconds(value: str | None) -> float:
+    if value is None:
+        return ENERGY_SUMMARY_RATE_LIMIT_SECONDS
+    try:
+        return max(float(value), ENERGY_SUMMARY_CACHE_SECONDS)
+    except ValueError:
+        return ENERGY_SUMMARY_RATE_LIMIT_SECONDS
 
 def _compute_relative_temperature(
     absolute_temperature: float,

@@ -1,4 +1,6 @@
 import logging
+from datetime import timedelta
+
 from homeassistant.components.sensor import (
     SensorEntity,
     SensorDeviceClass,
@@ -8,6 +10,8 @@ from homeassistant.const import UnitOfEnergy
 from .const import DOMAIN, API
 
 _LOGGER = logging.getLogger(__name__)
+
+SCAN_INTERVAL = timedelta(minutes=10)
 
 async def async_setup_entry(hass, config_entry, async_add_entities):
     api = hass.data[DOMAIN][API]
