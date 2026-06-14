@@ -11,7 +11,7 @@ from .const import DOMAIN, API
 
 _LOGGER = logging.getLogger(__name__)
 
-SCAN_INTERVAL = timedelta(minutes=10)
+SCAN_INTERVAL = timedelta(hours=1)
 
 async def async_setup_entry(hass, config_entry, async_add_entities):
     api = hass.data[DOMAIN][API]
