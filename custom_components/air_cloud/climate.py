@@ -215,12 +215,31 @@ class AirCloudClimateEntity(ClimateEntity):
         default = float(s.get("default_temperature", 24.0))
         return default + ref
 
-    def _clamp_temp(self, value: float, mode: str) -> float:
+    def _temp_range_for(self, mode: str | None = None) -> tuple[float, float]:
         s = self._mode_settings_for(mode)
         ref = float(s.get("reference_temperature", 0.0))
         lo = float(s.get("min_temperature", 16.0)) + ref
         hi = float(s.get("max_temperature", 32.0)) + ref
-        if lo >= hi:
+        return lo, hi
+
+    def _union_temp_range(self) -> tuple[float, float]:
+        ranges = [
+            self._temp_range_for(mode)
+            for mode, settings in self._mode_settings.items()
+            if settings.get("temperature_enabled", True)
+        ]
+        if not ranges:
+            return 16.0, 32.0
+        return min(lo for lo, _ in ranges), max(hi for _, hi in ranges)
+
+    def _reported_temp_range(self) -> tuple[float, float]:
+        if not self._mode_settings_for(self._mode).get("temperature_enabled", True):
+            return self._union_temp_range()
+        return self._temp_range_for(self._mode)
+
+    def _clamp_temp(self, value: float, mode: str) -> float:
+        lo, hi = self._temp_range_for(mode)
+        if lo > hi:
             return value
         return max(lo, min(hi, value))
 
@@ -394,15 +413,11 @@ class AirCloudClimateEntity(ClimateEntity):
 
     @property
     def min_temp(self) -> float:
-        s = self._mode_settings_for(self._mode)
-        ref = float(s.get("reference_temperature", 0.0))
-        return float(s.get("min_temperature", 16.0)) + ref
+        return self._reported_temp_range()[0]
 
     @property
     def max_temp(self) -> float:
-        s = self._mode_settings_for(self._mode)
-        ref = float(s.get("reference_temperature", 0.0))
-        return float(s.get("max_temperature", 32.0)) + ref
+        return self._reported_temp_range()[1]
 
     @property
     def hvac_mode(self) -> HVACMode:
