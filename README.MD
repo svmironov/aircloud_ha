@@ -4,6 +4,10 @@
 
 This integration controls Hitachi climate devices through the airCloud Home service.
 
+This software is not affiliated with or endorsed by Hitachi or any of its affiliated companies. Use of this software is entirely at your own risk. Under no circumstances shall the author be held liable for any damage, loss of property, or harm to third parties resulting from the use of this software.
+
+All product names, trademarks, and registered trademarks mentioned or shown in this repository are the property of their respective owners. All images in this repository are used solely for identification purposes.
+
 ## Features
 
 * Temperature change
@@ -58,10 +62,6 @@ The integration provides a service for a single command:
       fan_swing: "OFF" # VERTICAL, HORIZONTAL, BOTH or OFF
       humidity: 0 # It is magic number, select experimentally for your model from 0, 50, 2147483647
 ```
-
-This software is not affiliated with or endorsed by Hitachi or any of its affiliated companies. Use of this software is entirely at your own risk. Under no circumstances shall the author be held liable for any damage, loss of property, or harm to third parties resulting from the use of this software.
-
-All product names, trademarks, and registered trademarks mentioned or shown in this repository are the property of their respective owners. All images in this repository are used solely for identification purposes.
 
 ## Fully local ESPHome mode
 
