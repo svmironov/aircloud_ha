@@ -1,0 +1,436 @@
+[
+    {
+        "name": "Buzz",
+        "dest": "IDU",
+        "mode": 193449999,
+        "type": "Int",
+        "builtin": true
+    },
+    {
+        "name": "FanS",
+        "dest": "IDU",
+        "mode": 193974655,
+        "type": "Int",
+        "builtin": true
+    },
+    {
+        "name": "FanSw",
+        "dest": "IDU",
+        "mode": 193974655,
+        "type": "Int",
+        "builtin": true
+    },
+    {
+        "name": "FilS",
+        "dest": "IDU",
+        "mode": 193974655,
+        "type": "Int",
+        "builtin": true
+    },
+    {
+        "name": "FltT",
+        "dest": "IDU",
+        "mode": 193466737,
+        "type": "Int",
+        "builtin": true
+    },
+    {
+        "name": "HExT",
+        "dest": "IDU",
+        "mode": 193466737,
+        "type": "Float",
+        "builtin": true
+    },
+    {
+        "name": "HExT",
+        "dest": "ODU",
+        "mode": 193466737,
+        "type": "Float",
+        "builtin": true
+    },
+    {
+        "name": "Hr",
+        "dest": "IDU",
+        "mode": 193466737,
+        "type": "Float",
+        "builtin": true
+    },
+    {
+        "name": "Mode",
+        "dest": "IDU",
+        "mode": 193974655,
+        "type": "Int",
+        "builtin": true
+    },
+    {
+        "name": "Modl",
+        "dest": "IDU",
+        "mode": 193466737,
+        "type": "Str",
+        "builtin": true
+    },
+    {
+        "name": "OnOf",
+        "dest": "IDU",
+        "mode": 193974655,
+        "type": "Int",
+        "builtin": true
+    },
+    {
+        "name": "Opt1",
+        "dest": "IDU",
+        "mode": 193974655,
+        "type": "Int",
+        "builtin": true
+    },
+    {
+        "name": "Opt2",
+        "dest": "IDU",
+        "mode": 193974655,
+        "type": "Int",
+        "builtin": true
+    },
+    {
+        "name": "Opt3",
+        "dest": "IDU",
+        "mode": 193974655,
+        "type": "Int",
+        "builtin": true
+    },
+    {
+        "name": "Opt4",
+        "dest": "IDU",
+        "mode": 193974655,
+        "type": "Int",
+        "builtin": true
+    },
+    {
+        "name": "Pwd",
+        "dest": "IDU",
+        "mode": 193449999,
+        "type": "Str",
+        "builtin": true
+    },
+    {
+        "name": "PwrC",
+        "dest": "IDU",
+        "mode": 193466737,
+        "type": "Int",
+        "builtin": true
+    },
+    {
+        "name": "PwrI",
+        "dest": "IDU",
+        "mode": 193466737,
+        "type": "Int",
+        "builtin": true
+    },
+    {
+        "name": "Rair",
+        "dest": "IDU",
+        "mode": 193466737,
+        "type": "Int",
+        "builtin": true
+    },
+    {
+        "name": "RlMd",
+        "dest": "IDU",
+        "mode": 193466737,
+        "type": "Int",
+        "builtin": true
+    },
+    {
+        "name": "SetT",
+        "dest": "IDU",
+        "mode": 193974655,
+        "type": "Float",
+        "builtin": true
+    },
+    {
+        "name": "SSID",
+        "dest": "IDU",
+        "mode": 193449999,
+        "type": "Str",
+        "builtin": true
+    },
+    {
+        "name": "Ta",
+        "dest": "ODU",
+        "mode": 193466737,
+        "type": "Float",
+        "builtin": true
+    },
+    {
+        "name": "Time",
+        "dest": "IDU",
+        "mode": 193466737,
+        "type": "Str",
+        "builtin": true
+    },
+    {
+        "name": "Tr",
+        "dest": "IDU",
+        "mode": 193466737,
+        "type": "Float",
+        "builtin": true
+    },
+    {
+        "name": "WSt",
+        "dest": "IDU",
+        "mode": 193974655,
+        "type": "Int",
+        "builtin": true
+    },
+    {
+        "name": "WtmS",
+        "dest": "IDU",
+        "mode": 193974655,
+        "type": "Int",
+        "builtin": true
+    },
+    {
+        "name": "TYPE",
+        "dest": "IDU",
+        "mode": 193449999,
+        "type": null,
+        "builtin": false
+    },
+    {
+        "name": "TPID",
+        "dest": "IDU",
+        "mode": 193466737,
+        "type": null,
+        "builtin": false
+    },
+    {
+        "name": "PwrZ",
+        "dest": "IDU",
+        "mode": 193466737,
+        "type": null,
+        "builtin": false
+    },
+    {
+        "name": "SwrZ",
+        "dest": "IDU",
+        "mode": 193466737,
+        "type": null,
+        "builtin": false
+    },
+    {
+        "name": "ItW",
+        "dest": "IDU",
+        "mode": 193466737,
+        "type": null,
+        "builtin": false
+    },
+    {
+        "name": "Fota",
+        "dest": "IDU",
+        "mode": 193466737,
+        "type": null,
+        "builtin": false
+    },
+    {
+        "name": "Stat",
+        "dest": "IDU",
+        "mode": 193466737,
+        "type": null,
+        "builtin": false
+    },
+    {
+        "name": "ALM",
+        "dest": "IDU",
+        "mode": 193466737,
+        "type": null,
+        "builtin": false
+    },
+    {
+        "name": "Thmo",
+        "dest": "IDU",
+        "mode": 193466737,
+        "type": null,
+        "builtin": false
+    },
+    {
+        "name": "SetTR",
+        "dest": "IDU",
+        "mode": 193466737,
+        "type": null,
+        "builtin": false
+    },
+    {
+        "name": "Hs",
+        "dest": "IDU",
+        "mode": 193466737,
+        "type": null,
+        "builtin": false
+    },
+    {
+        "name": "FanHD",
+        "dest": "IDU",
+        "mode": 193466737,
+        "type": null,
+        "builtin": false
+    },
+    {
+        "name": "CapC",
+        "dest": "IDU",
+        "mode": 193466737,
+        "type": null,
+        "builtin": false
+    },
+    {
+        "name": "MdDtl",
+        "dest": "IDU",
+        "mode": 193466737,
+        "type": null,
+        "builtin": false
+    },
+    {
+        "name": "Maint",
+        "dest": "IDU",
+        "mode": 193466737,
+        "type": null,
+        "builtin": false
+    },
+    {
+        "name": "Comm",
+        "dest": "IDU",
+        "mode": 193466737,
+        "type": null,
+        "builtin": false
+    },
+    {
+        "name": "PinR",
+        "dest": "IDU",
+        "mode": 193466737,
+        "type": null,
+        "builtin": false
+    },
+    {
+        "name": "Opt5",
+        "dest": "IDU",
+        "mode": 193466737,
+        "type": null,
+        "builtin": false
+    },
+    {
+        "name": "Opt6",
+        "dest": "IDU",
+        "mode": 193466737,
+        "type": null,
+        "builtin": false
+    },
+    {
+        "name": "Opt7",
+        "dest": "IDU",
+        "mode": 193466737,
+        "type": null,
+        "builtin": false
+    },
+    {
+        "name": "Opt8",
+        "dest": "IDU",
+        "mode": 193466737,
+        "type": null,
+        "builtin": false
+    },
+    {
+        "name": "Func1",
+        "dest": "IDU",
+        "mode": 193466737,
+        "type": null,
+        "builtin": false
+    },
+    {
+        "name": "Func2",
+        "dest": "IDU",
+        "mode": 193466737,
+        "type": null,
+        "builtin": false
+    },
+    {
+        "name": "Func3",
+        "dest": "IDU",
+        "mode": 193466737,
+        "type": null,
+        "builtin": false
+    },
+    {
+        "name": "Func4",
+        "dest": "IDU",
+        "mode": 193466737,
+        "type": null,
+        "builtin": false
+    },
+    {
+        "name": "Func5",
+        "dest": "IDU",
+        "mode": 193466737,
+        "type": null,
+        "builtin": false
+    },
+    {
+        "name": "Func6",
+        "dest": "IDU",
+        "mode": 193466737,
+        "type": null,
+        "builtin": false
+    },
+    {
+        "name": "Dmd",
+        "dest": "IDU",
+        "mode": 193466737,
+        "type": null,
+        "builtin": false
+    },
+    {
+        "name": "Cinfo",
+        "dest": "IDU",
+        "mode": 193466737,
+        "type": null,
+        "builtin": false
+    },
+    {
+        "name": "Info1",
+        "dest": "IDU",
+        "mode": 193466737,
+        "type": null,
+        "builtin": false
+    },
+    {
+        "name": "Info2",
+        "dest": "IDU",
+        "mode": 193466737,
+        "type": null,
+        "builtin": false
+    },
+    {
+        "name": "Info3",
+        "dest": "IDU",
+        "mode": 193466737,
+        "type": null,
+        "builtin": false
+    },
+    {
+        "name": "Info4",
+        "dest": "IDU",
+        "mode": 193466737,
+        "type": null,
+        "builtin": false
+    },
+    {
+        "name": "Info5",
+        "dest": "IDU",
+        "mode": 193466737,
+        "type": null,
+        "builtin": false
+    },
+    {
+        "name": "H1",
+        "dest": "ODU",
+        "mode": 193466737,
+        "type": null,
+        "builtin": false
+    }
+]

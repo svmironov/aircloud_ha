@@ -1,0 +1,259 @@
+esphome:
+  # These values are created by scripts/configure_local_firmware.sh. The model
+  # is presentation metadata only; it does not select a different HLINK2 build.
+  name: !secret device_name
+  friendly_name: !secret friendly_name
+  project:
+    name: local.hitachi_hlink2
+    version: "2026.07.24.2"
+  # LibreTiny's SerialClass::begin() enables the AmebaZ RX path and the RX data
+  # interrupt in beginPrivate(), and only then calls configure() -> UART_Init(),
+  # which resets both. Transmission is unaffected, so the indoor unit executes
+  # commands while the UART never receives a single reply byte. Re-enable the
+  # receiver once the UART component is set up. Nothing is sent to the indoor unit.
+  includes:
+    - include/hlink2_rx_fix.h
+    - include/hlink2_rx_fix.c
+  on_boot:
+    priority: -100
+    then:
+      - lambda: |-
+          auto r = hlink2_reenable_uart0_rx();
+          ESP_LOGI("rxfix", "UART0 RX re-enabled: INTCR 0x%08X -> 0x%08X, RX_PATH 0x%08X -> 0x%08X",
+                   (unsigned) r.intcr_before, (unsigned) r.intcr_after,
+                   (unsigned) r.rx_path_before, (unsigned) r.rx_path_after);
+  platformio_options:
+    platform_packages:
+      # Required by hitachi_altwifi to avoid an ArduinoCore-API ring-buffer error.
+      - framework-arduino-api @ https://github.com/clsergent/ArduinoCore-API#f470e0a7f7964957d88465ff3ac5a024aa04da06
+    build_flags:
+      - -std=gnu++17
+      # LibreTiny calls this LT_SERIAL_BUFFER_SIZE; the previous
+      # LT_UART_RX_BUFFER_SIZE define was ignored. 256 was sized for the 182-byte
+      # climate response and is too small for the Premium sweep: its 19-mnemonic
+      # groups answer with roughly 300 bytes, which takes over 300 ms at 9600 baud
+      # and loses its tail. Heap is not scarce here (~50-68 KB free).
+      - -DLT_SERIAL_BUFFER_SIZE=512
+      # Prevent an interrupt/main-loop race in ArduinoCore-API RingBuffer from
+      # permanently corrupting UART RX while leaving TX operational.
+      - -DHLINK2_UART_RX_IRQ_GUARD=1
+    build_unflags:
+      - -std=gnu++11
+
+rtl87xx:
+  board: generic-rtl8710bn-2mb-788k
+  framework:
+    # Pin the LibreTiny release already verified against this RTL8710BN target.
+    version: 1.13.0
+
+# UART2 (PA30/PA29) remains available for bootloader and diagnostic logs.
+logger:
+  level: INFO
+
+
+
+# ESPHome suppresses wifi.reboot_timeout whenever an ap: block exists. Use an
+# explicitly cancellable timer so only one continuous three-minute outage can
+# reboot the controller; a brief disconnect followed by reconnect cannot leave
+# an old delayed action armed.
+# Staleness guard for the HLINK2 link itself. Wi-Fi and the API can both be healthy
+# while reception is dead: entities freeze, the node stays online and commands still
+# transmit. Every successful status parse restarts this script, so it only runs to
+# completion when the bus has genuinely gone quiet.
+script:
+  - id: hlink2_stall_guard
+    mode: restart
+    then:
+      - delay: 3min
+      - logger.log:
+          level: WARN
+          format: "No HLINK2 status for 3 minutes; restarting UART0 RX"
+      - lambda: |-
+          // Recreate ArduinoCore's software ring buffer in case this firmware was
+          // installed while its counter was already corrupted.
+          auto *serial = id(hitachi_bus).get_hw_serial();
+          if (serial != nullptr) {
+            serial->begin(id(hitachi_bus).get_baud_rate(), id(hitachi_bus).get_config());
+          }
+          // SerialClass::configure() resets these AmebaZ RX controls.
+          auto r = hlink2_reenable_uart0_rx();
+          ESP_LOGW("rxfix", "stall guard restarted UART0: INTCR 0x%08X -> 0x%08X, RX_PATH 0x%08X -> 0x%08X",
+                   (unsigned) r.intcr_before, (unsigned) r.intcr_after,
+                   (unsigned) r.rx_path_before, (unsigned) r.rx_path_after);
+      - delay: 7min
+      - logger.log:
+          level: ERROR
+          format: "No HLINK2 status for 10 minutes; UART restart did not recover reception"
+  - id: reboot_after_wifi_outage
+    mode: restart
+    then:
+      - delay: 3min
+      - if:
+          condition:
+            not:
+              wifi.connected:
+          then:
+            - logger.log:
+                level: WARN
+                format: "Wi-Fi disconnected for 3 minutes; rebooting"
+            - lambda: |-
+                App.reboot();
+
+# Home Wi-Fi credentials are embedded by the configuration script. The AP declaration
+# is retained only as an emergency ESPHome setting; ap_timeout: 0s prevents it from
+# starting. captive_portal/web_server stay out of the production image.
+wifi:
+  # Embedded so a cable install boots straight onto the home network: a full
+  # stock restore wipes the kvs partition, so credentials provisioned through
+  # the captive portal do not survive it.
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: !secret fallback_ap_ssid
+    password: !secret fallback_ap_password
+    # 0s stops the fallback AP from ever starting. Raising it grabs ~28 KB of heap
+    # the moment the station drops for a few seconds, and the board then sits in
+    # AP mode forever, which is what needed a power cycle from the remote.
+    ap_timeout: 0s
+  # Reconnect straight to the stored network instead of scanning first. This was
+  # originally added on a heap theory that measurement disproved (~54 KB free), so it
+  # is kept only because a scan-free reconnect is faster and cheaper, not as a fix.
+  fast_connect: true
+  # Avoid periodic post-connect roaming scans on the fragile AmebaZ Wi-Fi stack.
+  post_connect_roaming: false
+  # wifi.reboot_timeout is suppressed by the mere presence of ap:, even though
+  # ap_timeout is zero. This explicit guard remains active after a disconnect.
+  on_disconnect:
+    then:
+      - script.execute: reboot_after_wifi_outage
+  on_connect:
+    then:
+      - script.stop: reboot_after_wifi_outage
+  # Note: this native guard is dead code while an ap: block exists at all —
+  # wifi_component.cpp guards it with !has_ap(). The script above replaces it.
+  reboot_timeout: 5min
+
+api:
+  encryption:
+    key: !secret api_encryption_key
+  # Required by hlink2's diagnostic action_custom_message service.
+  custom_services: true
+  # Secondary guard: this fires only while the API client list is empty. A stale
+  # TCP client can prevent it, which is why Wi-Fi has its own guard above.
+  reboot_timeout: 5min
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+# Local copy of hlink2 from hitachi_altwifi commit 13aa4cba7adc798ce1cfb442b428804c7b0fee64.
+# It contains a narrowly scoped ESPHome 2026.3 compatibility patch; see README.md.
+external_components:
+  - source:
+      type: local
+      path: components
+    components: [hlink2]
+
+# The boot-time RX re-enable is not durable: reception died again after hours of
+# uptime, with every STS_IDU expiring. Re-arm it periodically — both register writes
+# are idempotent, so this is a no-op while the receiver is healthy. It also reports
+# whether the receiver was actually off, which separates "our UART was disabled"
+# from "the indoor unit went silent".
+interval:
+  - interval: 30s
+    then:
+      - lambda: |-
+          auto r = hlink2_reenable_uart0_rx();
+          if ((r.intcr_before & 1) == 0) {
+            ESP_LOGW("rxfix", "UART0 RX was OFF (INTCR 0x%08X RX_PATH 0x%08X LSR 0x%08X) - re-enabled",
+                     (unsigned) r.intcr_before, (unsigned) r.rx_path_before, (unsigned) r.lsr);
+          }
+
+# HLINK2 is connected to UART0 on the stock Wi-Fi board.
+uart:
+  id: hitachi_bus
+  tx_pin: GPIO23
+  rx_pin: GPIO18
+  baud_rate: 9600
+  parity: ODD
+  # Sized for the Premium sweep: 19-mnemonic groups answer with roughly 300 bytes,
+  # so the earlier 256 truncated them and every reply failed its checksum.
+  rx_buffer_size: 512
+
+hlink2:
+  id: hlink2_ac
+  uart_id: hitachi_bus
+  parameters:
+    task_timeout: 30ms
+    uart_tx_chunck_size: 16
+    message_mnemonics_capacity: 13
+    message_update_interval: 30s
+    message_update_timeout: 4s
+
+# Model names do not change this protocol profile. Official stock onboarding has
+# already registered the physical module, so no model-specific registration replay
+# or factory SoftAP credentials are required here.
+climate:
+  - platform: hlink2
+    id: hitachi_climate
+    name: Climate
+    hvac_actions: true
+    # The component offers NONE/AWAY/ECO/BOOST/SLEEP/Silence by default, but this
+    # unit acts on none of them: the vendor model profile (JP-Premium) has eco and
+    # airSleep disabled, and AWAY is accepted with Res:0 while Opt4 stays 0 in the
+    # status. An empty list drops the preset control from Home Assistant entirely.
+    supported_presets: []
+    command:
+      buzzer: true
+      qos: high
+    status:
+      update_interval: 5s
+      qos: low
+    visual:
+      min_temperature: 16.0
+      max_temperature: 32.0
+      temperature_step:
+        target_temperature: 0.5
+        current_temperature: 0.5
+
+sensor:
+  - platform: hlink2
+    indoor_temperature:
+      name: Indoor temperature
+      update_interval: 30s
+      promote: true
+      qos: low
+      on_value:
+        - script.execute: hlink2_stall_guard
+  - platform: hlink2
+    indoor_humidity:
+      name: Indoor humidity
+      update_interval: 30s
+      promote: true
+      qos: low
+  - platform: hlink2
+    outdoor_temperature:
+      name: Outdoor temperature
+      update_interval: 60s
+      promote: false
+      qos: low
+  # PwrC is the stock firmware's energy counter. It arrives in Wh, so it is scaled
+  # here and relabelled; the component's own default is Wh with zero decimals.
+  - platform: hlink2
+    energy:
+      name: Total energy
+      unit_of_measurement: kWh
+      accuracy_decimals: 3
+      filters:
+        - multiply: 0.001
+      update_interval: 60s
+      promote: false
+      qos: low
+
+
+# Remote reboot from Home Assistant. The board is otherwise only recoverable by
+# cutting its power, which on these units means reaching for the remote.
+button:
+  - platform: restart
+    name: Restart
+    entity_category: config

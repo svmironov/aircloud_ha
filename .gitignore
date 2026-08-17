@@ -1,0 +1,73 @@
+# Operating-system and editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Python environments, caches and test output
+.venv/
+venv/
+env/
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Local environment files and private keys
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+
+# Logs, captures and local databases
+*.log
+*.pcap
+*.pcapng
+*.har
+*.sqlite
+*.sqlite3
+*.jsonl
+
+# Captured cloud traffic and decompiled vendor applications
+airCloud Go_4/
+test/airCloud Go_4/
+
+# Firmware binaries, hardware dumps and reverse-engineering work products
+*.bin
+*.uf2
+*.elf
+*.map
+*.dump
+*.bak
+original_fimware/
+original_firmware/
+tools/LOCAL_CONTROL_RESEARCH.md
+test/AC_Status.json
+
+# Internal stock-cloud/onboarding probes and notes may contain per-unit credentials.
+# The publishable local-mode helpers live under tools/esphome/scripts/.
+tools/README_kii_mitm.md
+tools/hitachi_ap_onboard.py
+tools/hitachi_local_probe.py
+tools/hitachi_mdns_probe.py
+tools/kii_mitm_addon.py
+tools/kii_parse_flows.py
+
+# Local test/output directories
+custom_components/air_cloud/Test/
+custom_components/output/
+
+# ESPHome credentials, build state, private binaries and hardware backups
+tools/esphome/.esphome/
+tools/esphome/artifacts/
+tools/esphome/backups/
+tools/esphome/dist/
+tools/esphome/secrets.yaml

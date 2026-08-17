@@ -1,0 +1,210 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ESPHOME_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+SECRETS_FILE="${ESPHOME_DIR}/secrets.yaml"
+
+MODEL="${HITACHI_MODEL:-}"
+DEVICE_NAME="${HITACHI_DEVICE_NAME:-}"
+WIFI_SSID="${WIFI_SSID:-}"
+WIFI_PASSWORD="${WIFI_PASSWORD:-}"
+FORCE=0
+
+usage() {
+  cat <<EOF
+Usage: $0 [OPTIONS]
+
+Creates the private secrets.yaml used by the universal Hitachi local firmware.
+With no options, the script interactively asks for:
+  - the air-conditioner model (displayed in Home Assistant only);
+  - a unique ESPHome node name;
+  - the home Wi-Fi SSID and password.
+
+Options:
+  --model MODEL          Model label, for example RAK-DJ25PHAE
+  --name NODE_NAME       Unique ESPHome name (lower-case letters, digits, hyphens)
+  --wifi-ssid SSID       Home Wi-Fi SSID
+  --wifi-password PASS   Home Wi-Fi password (interactive entry is safer)
+  --force                Replace an existing secrets.yaml
+  -h, --help             Show this help
+
+The same values can be supplied through HITACHI_MODEL, HITACHI_DEVICE_NAME,
+WIFI_SSID and WIFI_PASSWORD environment variables.
+EOF
+}
+
+require_command() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    echo "Error: required command not found: $1" >&2
+    exit 1
+  fi
+}
+
+yaml_escape() {
+  # YAML single-quoted strings escape an apostrophe by doubling it.
+  printf '%s' "$1" | sed "s/'/''/g"
+}
+
+reject_newlines() {
+  local label="$1"
+  local value="$2"
+  case "${value}" in
+    *$'\n'*|*$'\r'*)
+      echo "Error: ${label} cannot contain a newline." >&2
+      exit 2
+      ;;
+  esac
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --model)
+      [[ $# -ge 2 ]] || { echo "Error: --model requires a value." >&2; exit 2; }
+      MODEL="$2"
+      shift 2
+      ;;
+    --name)
+      [[ $# -ge 2 ]] || { echo "Error: --name requires a value." >&2; exit 2; }
+      DEVICE_NAME="$2"
+      shift 2
+      ;;
+    --wifi-ssid)
+      [[ $# -ge 2 ]] || { echo "Error: --wifi-ssid requires a value." >&2; exit 2; }
+      WIFI_SSID="$2"
+      shift 2
+      ;;
+    --wifi-password)
+      [[ $# -ge 2 ]] || { echo "Error: --wifi-password requires a value." >&2; exit 2; }
+      WIFI_PASSWORD="$2"
+      shift 2
+      ;;
+    --force)
+      FORCE=1
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Error: unknown option: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+done
+
+require_command openssl
+require_command sed
+require_command tr
+
+if [[ -z "${MODEL}" ]]; then
+  read -r -p "Air-conditioner model (for example RAK-DJ25PHAE): " MODEL
+fi
+if [[ -z "${MODEL}" ]]; then
+  echo "Error: model cannot be empty." >&2
+  exit 2
+fi
+
+MODEL_SLUG="$(
+  printf '%s' "${MODEL}" \
+    | tr '[:upper:]' '[:lower:]' \
+    | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//'
+)"
+if [[ -z "${MODEL_SLUG}" ]]; then
+  echo "Error: model must contain at least one ASCII letter or digit." >&2
+  exit 2
+fi
+case "${MODEL_SLUG}" in
+  hitachi-*) DEFAULT_NAME="${MODEL_SLUG}" ;;
+  *) DEFAULT_NAME="hitachi-${MODEL_SLUG}" ;;
+esac
+DEFAULT_NAME="${DEFAULT_NAME:0:31}"
+DEFAULT_NAME="$(printf '%s' "${DEFAULT_NAME}" | sed -E 's/-+$//')"
+
+if [[ -z "${DEVICE_NAME}" ]]; then
+  read -r -p "Unique ESPHome node name [${DEFAULT_NAME}]: " DEVICE_NAME
+  DEVICE_NAME="${DEVICE_NAME:-${DEFAULT_NAME}}"
+fi
+if [[ ! "${DEVICE_NAME}" =~ ^[a-z][a-z0-9-]*[a-z0-9]$ ]] && [[ ! "${DEVICE_NAME}" =~ ^[a-z]$ ]]; then
+  echo "Error: node name must start with a lower-case letter and contain only a-z, 0-9 and hyphens." >&2
+  exit 2
+fi
+if [[ ${#DEVICE_NAME} -gt 31 ]]; then
+  echo "Error: node name must be no longer than 31 characters." >&2
+  exit 2
+fi
+
+if [[ -z "${WIFI_SSID}" ]]; then
+  read -r -p "Home Wi-Fi SSID: " WIFI_SSID
+fi
+if [[ -z "${WIFI_SSID}" ]]; then
+  echo "Error: Wi-Fi SSID cannot be empty." >&2
+  exit 2
+fi
+if [[ -z "${WIFI_PASSWORD}" ]]; then
+  if [[ -t 0 ]]; then
+    read -r -s -p "Home Wi-Fi password: " WIFI_PASSWORD
+    echo
+  else
+    read -r WIFI_PASSWORD
+  fi
+fi
+if [[ -z "${WIFI_PASSWORD}" ]]; then
+  echo "Error: Wi-Fi password cannot be empty." >&2
+  exit 2
+fi
+
+reject_newlines "model" "${MODEL}"
+reject_newlines "Wi-Fi SSID" "${WIFI_SSID}"
+reject_newlines "Wi-Fi password" "${WIFI_PASSWORD}"
+
+if [[ -f "${SECRETS_FILE}" && ${FORCE} -ne 1 ]]; then
+  if [[ -t 0 ]]; then
+    read -r -p "${SECRETS_FILE} already exists. Replace it? [y/N] " REPLY
+    case "${REPLY}" in
+      y|Y|yes|YES) ;;
+      *) echo "Cancelled."; exit 1 ;;
+    esac
+  else
+    echo "Error: ${SECRETS_FILE} already exists; use --force to replace it." >&2
+    exit 1
+  fi
+fi
+
+case "${MODEL}" in
+  Hitachi*|HITACHI*|hitachi*) FRIENDLY_NAME="${MODEL}" ;;
+  *) FRIENDLY_NAME="Hitachi ${MODEL}" ;;
+esac
+FALLBACK_AP_SSID="${DEVICE_NAME:0:26}-setup"
+FALLBACK_AP_PASSWORD="$(openssl rand -hex 16)"
+API_ENCRYPTION_KEY="$(openssl rand -base64 32 | tr -d '\n')"
+OTA_PASSWORD="$(openssl rand -hex 24)"
+
+umask 077
+TMP_FILE="${SECRETS_FILE}.tmp.$$"
+trap 'rm -f "${TMP_FILE}"' EXIT
+{
+  echo "# Generated by scripts/configure_local_firmware.sh; never commit this file."
+  printf "device_name: '%s'\n" "$(yaml_escape "${DEVICE_NAME}")"
+  printf "friendly_name: '%s'\n" "$(yaml_escape "${FRIENDLY_NAME}")"
+  printf "wifi_ssid: '%s'\n" "$(yaml_escape "${WIFI_SSID}")"
+  printf "wifi_password: '%s'\n" "$(yaml_escape "${WIFI_PASSWORD}")"
+  printf "fallback_ap_ssid: '%s'\n" "$(yaml_escape "${FALLBACK_AP_SSID}")"
+  printf "fallback_ap_password: '%s'\n" "$(yaml_escape "${FALLBACK_AP_PASSWORD}")"
+  printf "api_encryption_key: '%s'\n" "$(yaml_escape "${API_ENCRYPTION_KEY}")"
+  printf "ota_password: '%s'\n" "$(yaml_escape "${OTA_PASSWORD}")"
+} > "${TMP_FILE}"
+mv "${TMP_FILE}" "${SECRETS_FILE}"
+trap - EXIT
+chmod 600 "${SECRETS_FILE}"
+
+echo
+echo "Created ${SECRETS_FILE}"
+echo "Model is identification metadata only; all models use hitachi-local.yaml."
+echo "ESPHome node: ${DEVICE_NAME}"
+echo "Home Assistant API encryption key: ${API_ENCRYPTION_KEY}"
+echo
+echo "Keep secrets.yaml private. Next run:"
+echo "  ${SCRIPT_DIR}/build_local_firmware.sh"
