@@ -90,3 +90,55 @@ There is no fully local operating mode with the stock Hitachi firmware: the stoc
 mobile application and module depend on the Hitachi/Kii cloud and expose no discovered
 LAN control API. True local control requires replacing the Wi-Fi module firmware or
 adding an external HLINK/IR controller.
+
+## Authentication recovery and command failures
+
+Malformed refresh responses and HTTP 401/403 trigger one full sign-in attempt.
+Both tokens are validated before either stored value changes. Concurrent refreshes
+are serialized, and HTTP 429, server errors and timeouts are reported without
+repeated login attempts inside the same operation. The existing five-minute
+refresh interval and refresh request format are unchanged.
+
+Rejected commands now raise a Home Assistant action error and keep the previous
+local state. A timeout cannot prove whether the cloud executed the command.
+Successful commands retain the existing optimistic update; a subsequent read
+failure is logged separately, rather than reporting the accepted command as failed.
+
+## Optional OFF compatibility for selected RAC devices
+
+This **experimental, disabled-by-default** option is based on an installation
+reported in Brazil. It is not a country-wide requirement, and other regions or
+models may already work with the standard payload. Acceptance of this variant by
+the current cloud endpoint and physical operation still need device validation.
+
+Open the AirCloud integration's **Configure** dialog and select only affected air
+conditioners under **OFF compatibility**. Changes apply without restarting Home
+Assistant. Leave the selection empty to use the upstream behavior. Remove a device
+from the selection to restore its standard OFF payload.
+
+Only OFF requests for explicitly selected, known RAC devices (`SysType=1`) add
+`adjustSwing` (0 for OFF swing, otherwise 1) and round the target temperature to
+an integer. The current `general-control-command-status` endpoint is retained.
+ON requests, fractional setpoints while operating, unselected devices, GPAC and
+Yutampo payloads are unchanged. Non-vertical swing values and AUTO-mode OFF still
+need verification with the affected devices; do not infer universal support from
+the historical VERTICAL/COOLING example.
+
+For an existing YAML-configured integration, the equivalent optional list is:
+
+```yaml
+air_cloud:
+  email: "your account"
+  password: !secret aircloud_password
+  legacy_rac_off_device_ids: [12345]  # use your affected RAC device IDs
+```
+
+Do not enable this option merely because the installation is located in Brazil.
+Record the model, mode, final payload and sanitized response when testing. Never
+publish passwords or access/refresh tokens.
+
+## Tests
+
+See [tests/README.md](tests/README.md) for the offline regression suite. Tests use
+real aiohttp requests to localhost and Home Assistant boundary fixtures; they do
+not certify live cloud or physical air-conditioner behavior.
