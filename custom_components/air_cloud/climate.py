@@ -15,6 +15,7 @@ from homeassistant.components.climate.const import (
     HVACMode,
 )
 from homeassistant.const import ATTR_TEMPERATURE, UnitOfTemperature
+from homeassistant.exceptions import HomeAssistantError
 
 from .api import (
     DEFAULT_FAN_SPEED,
@@ -328,8 +329,8 @@ class AirCloudClimateEntity(ClimateEntity):
                 desired_swing,
                 desired_humidity,
             )
-        except Exception as exc: 
-            _LOGGER.error("AirCloud: command failed: %s", exc)
+        except Exception as exc:
+            raise HomeAssistantError("AirCloud command failed; previous Home Assistant state was kept") from exc
         finally:
             self._command_in_flight = False
 
@@ -341,7 +342,11 @@ class AirCloudClimateEntity(ClimateEntity):
         self.async_write_ha_state()
 
         await asyncio.sleep(2)
-        devices = await self._api.load_climate_data(self._family_id, force=True)
+        try:
+            devices = await self._api.load_climate_data(self._family_id, force=True)
+        except Exception as exc:
+            _LOGGER.warning("AirCloud: command accepted but state refresh failed: %s", exc)
+            return
         for device in devices:
             if device.get("id") == self._device_id:
                 self._apply_snapshot(device)

@@ -57,6 +57,10 @@ def _fan_sort_key(speed: str) -> int:
     except ValueError:
         return len(FAN_SPEED_ORDER)
 
+class AirCloudAuthenticationError(RuntimeError):
+    """An authentication response did not contain a usable token pair."""
+
+
 class AirCloudApi:
     def __init__(self, login: str, password: str) -> None:
         self._login = login
@@ -64,6 +68,8 @@ class AirCloudApi:
         self._token: str | None = None
         self._ref_token: str | None = None
         self._last_token_update: datetime = datetime.now()
+        self._auth_lock = asyncio.Lock()
+        self._auth_generation = 0
         self._device_cache: dict[int, dict[str, Any]] = {}
         self._device_family: dict[int, int] = {}
         self._rac_config_cache: dict[str, dict[str, Any]] = {}
@@ -88,49 +94,77 @@ class AirCloudApi:
 
     async def validate_credentials(self) -> bool:
         try:
-            await self._authenticate()
+            await self._refresh_token(forced=True)
             return True
         except Exception as exc: 
             _LOGGER.error("AirCloud: failed to validate credentials: %s", exc)
             return False
 
     async def _authenticate(self) -> None:
+        """Sign in while the caller holds _auth_lock."""
         async with self._session.post(
             HOST_API + URN_AUTH,
             json={"email": self._login, "password": self._password},
             headers={"User-Agent": USER_AGENT},
         ) as resp:
             resp.raise_for_status()
-            data = await resp.json(content_type=None)
-        self._token = data["token"]
-        self._ref_token = data["refreshToken"]
-        self._last_token_update = datetime.now()
+            try:
+                data = await resp.json(content_type=None)
+            except ValueError:
+                raise AirCloudAuthenticationError("AirCloud sign-in returned invalid JSON") from None
+        self._update_tokens(data)
         _LOGGER.debug("AirCloud: authenticated, token obtained")
 
-    async def _refresh_token(self, *, forced: bool = False) -> None:
-        if self._token is None or forced:
-            await self._authenticate()
-            return
-
-        age = (datetime.now() - self._last_token_update).total_seconds()
-        if age <= 300: 
-            return
-
-        _LOGGER.debug("AirCloud: token older than 5 min, refreshing")
-        async with self._session.post(
-            HOST_API + URN_REFRESH_TOKEN,
-            headers={
-                "Authorization": f"Bearer {self._ref_token}",
-                "isRefreshToken": "true",
-                "User-Agent": USER_AGENT,
-            },
-        ) as resp:
-            resp.raise_for_status()
-            data = await resp.json(content_type=None)
-        self._token = data["token"]
-        self._ref_token = data["refreshToken"]
+    def _update_tokens(self, data: Any) -> None:
+        """Validate both credentials before replacing either stored token."""
+        if not isinstance(data, dict) or any(
+            not isinstance(data.get(key), str) or not data[key].strip()
+            for key in ("token", "refreshToken")
+        ):
+            raise AirCloudAuthenticationError("AirCloud authentication returned an invalid token pair")
+        self._token, self._ref_token = data["token"], data["refreshToken"]
         self._last_token_update = datetime.now()
-        _LOGGER.debug("AirCloud: token refreshed")
+        self._auth_generation += 1
+
+    async def _refresh_token(self, *, forced: bool = False) -> None:
+        generation = self._auth_generation
+        async with self._auth_lock:
+            # Another caller may already have replaced the rejected token.
+            if forced and generation != self._auth_generation:
+                return
+            if self._token is None or self._ref_token is None or forced:
+                await self._authenticate()
+                return
+
+            age = (datetime.now() - self._last_token_update).total_seconds()
+            if age <= 300:
+                return
+
+            _LOGGER.debug("AirCloud: token older than 5 min, refreshing")
+            try:
+                async with self._session.post(
+                    HOST_API + URN_REFRESH_TOKEN,
+                    headers={
+                        "Authorization": f"Bearer {self._ref_token}",
+                        "isRefreshToken": "true",
+                        "User-Agent": USER_AGENT,
+                    },
+                ) as resp:
+                    resp.raise_for_status()
+                    data = await resp.json(content_type=None)
+                self._update_tokens(data)
+            except aiohttp.ClientResponseError as exc:
+                if exc.status not in (401, 403):
+                    raise
+            except (ValueError, AirCloudAuthenticationError):
+                pass
+            else:
+                _LOGGER.debug("AirCloud: token refreshed")
+                return
+
+            _LOGGER.warning("AirCloud: refresh rejected or malformed; signing in again")
+            # Keep this outside the refresh try block: a failed login is not retried.
+            await self._authenticate()
 
     async def load_family_ids(self) -> list[int]:
         await self._refresh_token()
@@ -339,7 +373,7 @@ class AirCloudApi:
         humidity: int,
     ) -> None:
         if self._session.closed:
-            return
+            raise RuntimeError("AirCloud session is closed")
 
         await self._refresh_token()
 
