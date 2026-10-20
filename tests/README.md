@@ -1,5 +1,11 @@
 # Offline regression tests
 
+The historical manual patch was also tested in a real Home Assistant installation
+in Brazil, identified by its owner as version 2.2.8, and kept physical AC control
+working. The owner confirmed this on 20 October 2026. The limitations below
+describe this automated suite and the new implementation, not that historical
+field test. See the validation notes in [README.MD](../README.MD).
+
 From the repository root, with Python 3.12 or later:
 
 ```sh
