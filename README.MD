@@ -106,10 +106,18 @@ failure is logged separately, rather than reporting the accepted command as fail
 
 ## Optional OFF compatibility for selected RAC devices
 
-This **experimental, disabled-by-default** option is based on an installation
-reported in Brazil. It is not a country-wide requirement, and other regions or
-models may already work with the standard payload. Acceptance of this variant by
-the current cloud endpoint and physical operation still need device validation.
+**Historical live validation:** on 20 October 2026, the installation owner
+confirmed that directly modified `api.py` and `climate.py` files were tested in
+their Home Assistant installation in Brazil, identified as version **2.2.8**,
+and kept control of the physical air conditioners working correctly.
+
+**Validation of this revision:** the new per-device option adapts that working
+historical fix to the current integration, based on 2.3.1. Its automated tests
+pass, but field testing of this new implementation has not yet been reported.
+It therefore remains **experimental and disabled by default**. This limitation
+applies to the new implementation, not to the successfully tested manual patch.
+The option is not a country-wide requirement; other regions or models may
+already work with the standard payload.
 
 Open the AirCloud integration's **Configure** dialog and select only affected air
 conditioners under **OFF compatibility**. Changes apply without restarting Home
