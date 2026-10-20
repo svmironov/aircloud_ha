@@ -18,6 +18,7 @@ from .const import (
     CONF_PASSWORD,
     CONF_TEMP_ADJUST,
     CONF_TEMP_STEP,
+    CONF_LEGACY_RAC_OFF_DEVICE_IDS,
     DOMAIN,
     PLATFORM_BINARY_SENSOR,
     PLATFORM_BUTTON,
@@ -32,6 +33,15 @@ PLATFORMS = [PLATFORM_BINARY_SENSOR, PLATFORM_BUTTON, PLATFORM_CLIMATE, PLATFORM
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     api = AirCloudApi(entry.data[CONF_EMAIL], entry.data[CONF_PASSWORD])
+    api.set_legacy_rac_off_device_ids(entry.options.get(CONF_LEGACY_RAC_OFF_DEVICE_IDS, []))
+    entry.runtime_data = api
+
+    async def update_options(hass: HomeAssistant, updated_entry: ConfigEntry) -> None:
+        api.set_legacy_rac_off_device_ids(
+            updated_entry.options.get(CONF_LEGACY_RAC_OFF_DEVICE_IDS, [])
+        )
+
+    entry.async_on_unload(entry.add_update_listener(update_options))
     hass.data[DOMAIN] = {
         API: api,
         CONF_TEMP_ADJUST: {},
@@ -44,6 +54,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     conf = config.get(DOMAIN)
     if conf:
         api = AirCloudApi(conf.get(CONF_EMAIL, ""), conf.get(CONF_PASSWORD, ""))
+        api.set_legacy_rac_off_device_ids(conf.get(CONF_LEGACY_RAC_OFF_DEVICE_IDS, []))
         hass.data[DOMAIN] = {
             API: api,
             CONF_TEMP_ADJUST: {},

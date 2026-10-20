@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import math
 import uuid
 from datetime import datetime
 from typing import Any
@@ -72,6 +73,7 @@ class AirCloudApi:
         self._auth_generation = 0
         self._device_cache: dict[int, dict[str, Any]] = {}
         self._device_family: dict[int, int] = {}
+        self._legacy_rac_off_device_ids: set[int] = set()
         self._rac_config_cache: dict[str, dict[str, Any]] = {}
         self._energy_summary_cache: dict[int, dict[str, Any]] = {}
         self._energy_summary_timestamps: dict[int, float] = {}
@@ -361,6 +363,18 @@ class AirCloudApi:
     def get_cached_rac_config(self, cloud_id: str | None) -> dict[str, Any] | None:
         return self._rac_config_cache.get(cloud_id) if cloud_id else None
 
+    def set_legacy_rac_off_device_ids(self, device_ids: list[int]) -> None:
+        """Enable the experimental OFF payload only for explicitly selected devices."""
+        self._legacy_rac_off_device_ids = {int(device_id) for device_id in device_ids}
+
+    def get_rac_device_options(self) -> dict[str, str]:
+        """Return cached RAC choices without making configuration UI network calls."""
+        return {
+            str(device_id): f"{device.get('name', device_id)} ({device_id})"
+            for device_id, device in self._device_cache.items()
+            if _get_sys_type(device) == SYS_TYPE_G_RAC
+        }
+
     async def execute_command(
         self,
         device_id: int,
@@ -410,6 +424,17 @@ class AirCloudApi:
             "iduTemperature": temperature,
             "relativeTemperature": _compute_relative_temperature(temperature, mode, snapshot),
         }
+
+        if (
+            device_id in self._legacy_rac_off_device_ids
+            and _get_sys_type(snapshot) == SYS_TYPE_G_RAC
+            and power == "OFF"
+        ):
+            # Reported on a Brazilian installation; not a country-wide API rule.
+            if not math.isfinite(temperature):
+                raise ValueError("Legacy RAC OFF requires a finite target temperature")
+            payload["iduTemperature"] = int(round(temperature))
+            payload["adjustSwing"] = 0 if fan_swing == "OFF" else 1
 
         url = f"{HOST_API}{URN_CONTROL_STATUS}/{device_id}?familyId={family_id}"
         await self._put(url, payload)

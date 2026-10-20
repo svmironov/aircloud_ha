@@ -23,3 +23,8 @@ concurrent refresh and forced-login coalescing, transient-error handling, failed
 command state preservation, cancellation, successful command behavior, closed
 sessions, and preservation of the default RAC payload including half degrees.
 A successful HTTP response in these tests proves local request handling only.
+
+The options tests exercise selection defaults/persistence with HA form boundary
+fixtures; they do not render the frontend. Compatibility tests verify that only
+selected RAC OFF requests change, while ON, fractional temperatures, other RAC
+units, GPAC and Yutampo keep their original payloads.

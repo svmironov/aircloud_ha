@@ -17,5 +17,16 @@
         }
       }
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "OFF compatibility (experimental)",
+        "description": "Select only air conditioners that fail to turn off with the standard settings. Leave empty if your devices work correctly. This option was derived from a reported installation in Brazil; it is not a setting required for all Brazilian devices. Other commands and unselected devices keep their standard behavior.",
+        "data": {
+          "legacy_rac_off_device_ids": "Air conditioners requiring OFF compatibility"
+        }
+      }
+    }
   }
 }

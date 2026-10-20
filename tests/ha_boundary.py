@@ -51,6 +51,17 @@ def install_when_missing():
     class HomeAssistantError(Exception):
         pass
 
+    class ConfigFlow:
+        def __init_subclass__(cls, **kwargs):
+            super().__init_subclass__()
+
+    class OptionsFlow:
+        def async_show_form(self, **kwargs):
+            return {"type": "form", **kwargs}
+
+        def async_create_entry(self, **kwargs):
+            return {"type": "create_entry", **kwargs}
+
     module("homeassistant")
     module("homeassistant.components")
     module("homeassistant.components.climate", ClimateEntity=ClimateEntity)
@@ -75,11 +86,14 @@ def install_when_missing():
         positive_int=vol.All(vol.Coerce(int), vol.Range(min=0)),
         positive_float=vol.All(vol.Coerce(float), vol.Range(min=0)),
         string=str,
+        multi_select=lambda options: vol.All(list, [vol.In(options)]),
     )
-    module("homeassistant.config_entries", ConfigEntry=type("ConfigEntry", (), {}))
+    module("homeassistant.config_entries", ConfigEntry=type("ConfigEntry", (), {}),
+           ConfigFlow=ConfigFlow, OptionsFlow=OptionsFlow, CONN_CLASS_CLOUD_POLL="cloud_poll")
     module(
         "homeassistant.core", HomeAssistant=type("HomeAssistant", (), {}),
         ServiceCall=type("ServiceCall", (), {}),
+        callback=lambda fn: fn,
     )
     module("homeassistant.exceptions", HomeAssistantError=HomeAssistantError)
 
