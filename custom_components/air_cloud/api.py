@@ -34,6 +34,9 @@ _LOGGER = logging.getLogger(__name__)
 NO_HUMIDITY_VALUE: int = 2_147_483_647
 ENERGY_SUMMARY_CACHE_SECONDS: float = 3600.0
 ENERGY_SUMMARY_RATE_LIMIT_SECONDS: float = 1800.0
+LOGIN_ERROR_STATES = frozenset({
+    "UNKNOWN_USER", "Invalid UserId Or Password", "SOFT_LOCK", "HARD_LOCK",
+})
 
 DEFAULT_POWER = "OFF"
 DEFAULT_MODE = "COOLING"
@@ -64,8 +67,10 @@ class AirCloudAuthenticationError(RuntimeError):
 
 class AirCloudApi:
     def __init__(self, login: str, password: str) -> None:
-        self._login = login
-        self._password = password
+        # The Android login form applies String.trim() before sending either field.
+        trim_chars = "".join(chr(codepoint) for codepoint in range(33))
+        self._login = login.strip(trim_chars)
+        self._password = password.strip(trim_chars)
         self._token: str | None = None
         self._ref_token: str | None = None
         self._last_token_update: datetime = datetime.now()
@@ -94,11 +99,13 @@ class AirCloudApi:
             self._energy_summary_locks[family_id] = asyncio.Lock()
         return self._energy_summary_locks[family_id]
 
-    async def validate_credentials(self) -> bool:
+    async def validate_credentials(self, *, raise_on_error: bool = False) -> bool:
         try:
             await self._refresh_token(forced=True)
             return True
-        except Exception as exc: 
+        except Exception as exc:
+            if raise_on_error:
+                raise
             _LOGGER.error("AirCloud: failed to validate credentials: %s", exc)
             return False
 
@@ -107,8 +114,22 @@ class AirCloudApi:
         async with self._session.post(
             HOST_API + URN_AUTH,
             json={"email": self._login, "password": self._password},
-            headers={"User-Agent": USER_AGENT},
+            headers={"User-Agent": USER_AGENT, "Accept": "application/json"},
         ) as resp:
+            if resp.status >= 400:
+                # Only log known enum values; error bodies may contain account data.
+                error_state = "unrecognized"
+                try:
+                    error_data = await asyncio.wait_for(resp.json(content_type=None), timeout=5)
+                    candidate = error_data.get("errorState") if isinstance(error_data, dict) else None
+                    if isinstance(candidate, str) and candidate in LOGIN_ERROR_STATES:
+                        error_state = candidate
+                except (ValueError, aiohttp.ClientError, asyncio.TimeoutError):
+                    pass
+                _LOGGER.warning(
+                    "AirCloud: sign-in rejected (HTTP %s, errorState=%s)",
+                    resp.status, error_state,
+                )
             resp.raise_for_status()
             try:
                 data = await resp.json(content_type=None)

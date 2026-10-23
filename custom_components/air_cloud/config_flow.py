@@ -1,3 +1,7 @@
+import asyncio
+import logging
+
+import aiohttp
 from homeassistant import config_entries
 from homeassistant.core import callback
 from homeassistant.helpers import config_validation as cv
@@ -7,7 +11,17 @@ from .const import (
     DOMAIN, CONF_EMAIL, CONF_PASSWORD, CONFIG_FLOW_SCHEMA,
     CONF_LEGACY_RAC_OFF_DEVICE_IDS,
 )
-from .api import AirCloudApi
+from .api import AirCloudApi, AirCloudAuthenticationError
+
+_LOGGER = logging.getLogger(__name__)
+
+_LOGIN_ERRORS = {
+    401: "invalid_auth",
+    403: "account_disabled",
+    412: "account_unverified",
+    423: "account_locked",
+    429: "too_many_attempts",
+}
 
 
 class AirCloudConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -25,13 +39,30 @@ class AirCloudConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             login = user_input[CONF_EMAIL]
             password = user_input[CONF_PASSWORD]
 
-            if await AirCloudApi(login, password).validate_credentials():
-                return self.async_create_entry(title=login, data=user_input)
+            api = AirCloudApi(login, password)
+            try:
+                await api.validate_credentials(raise_on_error=True)
+            except aiohttp.ClientResponseError as exc:
+                error = _LOGIN_ERRORS.get(exc.status, "cannot_connect")
+                _LOGGER.warning("AirCloud: sign-in failed (HTTP %s)", exc.status)
+            except (aiohttp.ClientError, asyncio.TimeoutError):
+                error = "cannot_connect"
+                _LOGGER.warning("AirCloud: could not connect during sign-in")
+            except AirCloudAuthenticationError:
+                error = "unknown"
+                _LOGGER.warning("AirCloud: sign-in returned an invalid authentication response")
+            except Exception:
+                error = "unknown"
+                _LOGGER.error("AirCloud: unexpected error during sign-in")
+            else:
+                return self.async_create_entry(title=login.strip(), data=user_input)
+            finally:
+                await api.close_session()
 
             return self.async_show_form(
                 step_id="user",
                 data_schema=self.user_schema,
-                errors={"base": "invalid_credentials"}
+                errors={"base": error}
             )
 
         return self.async_show_form(

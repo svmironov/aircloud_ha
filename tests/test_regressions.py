@@ -68,6 +68,7 @@ class AirCloudHTTPCase(unittest.IsolatedAsyncioTestCase):
             "path": path, "method": request.method, "query": dict(request.query),
             "json": await request.json() if body else None,
             "authorization": request.headers.get("Authorization"),
+            "headers": dict(request.headers),
         })
         if path in self.handlers:
             return await self.handlers[path](request)

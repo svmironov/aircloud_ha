@@ -9,5 +9,16 @@
         }
       }
     }
+  },
+  "config": {
+    "error": {
+      "invalid_auth": "O AirCloud rejeitou o e-mail ou a senha. Use o e-mail e a senha usados para entrar no aplicativo airCloud Go.",
+      "cannot_connect": "Não foi possível conectar ao AirCloud. Verifique a conexão e tente novamente.",
+      "unknown": "Resposta inesperada do AirCloud durante o login.",
+      "account_disabled": "Esta conta AirCloud está desativada. Verifique a conta no aplicativo airCloud Go.",
+      "account_unverified": "Esta conta AirCloud não foi verificada. Conclua a verificação no aplicativo airCloud Go.",
+      "account_locked": "O AirCloud bloqueou esta conta após tentativas de login malsucedidas. Aguarde antes de tentar novamente e verifique o acesso no aplicativo airCloud Go.",
+      "too_many_attempts": "O AirCloud está limitando as tentativas de login. Aguarde antes de tentar novamente."
+    }
   }
 }

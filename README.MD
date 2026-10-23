@@ -36,6 +36,29 @@ You can add integration in the UI or manual in configuration.yml
 All devices are loaded from airCloud. A Home Assistant entity is created for every
 device using its airCloud name.
 
+### Sign-in troubleshooting
+
+Use the email and password used to sign in to the airCloud Go app. The integration
+removes leading/trailing ASCII whitespace from both fields, matching the Android
+app's login form, and requests a JSON response from the same sign-in endpoint.
+Internal spaces and non-ASCII password characters are preserved.
+The user agent matches the inspected airCloud Go 4.3.0 APK (`okhttp/5.3.2`).
+
+The setup form distinguishes rejected credentials (HTTP 401), disabled accounts
+(403), unverified accounts (412), locked accounts (423), rate limits (429), and
+connection/server errors. For a locked or rate-limited account, wait before
+retrying. For verification or account status problems, check the airCloud Go app.
+Each submission makes one sign-in attempt and closes its temporary HTTP session.
+On rejection, logs include the HTTP status and a recognized `errorState`
+(`UNKNOWN_USER`, `Invalid UserId Or Password`, `SOFT_LOCK`, or `HARD_LOCK`).
+Other values are reported as `unrecognized`; response bodies and credentials are
+not included in these diagnostic messages.
+
+These compatibility changes have offline regression coverage. They have not yet
+been verified against the account reporting [issue #68](https://github.com/svmironov/aircloud_ha/issues/68);
+a persistent 401 still requires checking that account's sign-in with the cloud.
+See the [4.3.0 APK authentication comparison](docs/aircloud-go-4.3.0-auth.md).
+
 ## Sample lovelace object
 
 ```yml

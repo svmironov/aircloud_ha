@@ -5,8 +5,12 @@
     },
     "error": {
       "cannot_connect": "Failed to connect",
-      "invalid_auth": "Invalid authentication",
-      "unknown": "Unexpected error"
+      "invalid_auth": "AirCloud rejected the email or password. Use the email and password used to sign in to the airCloud Go app.",
+      "unknown": "Unexpected error",
+      "account_disabled": "This AirCloud account is disabled. Check the account in the airCloud Go app.",
+      "account_unverified": "This AirCloud account has not been verified. Complete verification in the airCloud Go app.",
+      "account_locked": "AirCloud has locked this account after failed sign-in attempts. Wait before trying again and check access in the airCloud Go app.",
+      "too_many_attempts": "AirCloud is limiting sign-in attempts. Wait before trying again."
     },
     "step": {
       "user": {

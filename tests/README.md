@@ -30,6 +30,13 @@ command state preservation, cancellation, successful command behavior, closed
 sessions, and preservation of the default RAC payload including half degrees.
 A successful HTTP response in these tests proves local request handling only.
 
+Login tests cover the Android form's ASCII whitespace trimming, preservation of
+internal spaces and Unicode password characters, JSON request headers, translated
+HTTP error messages, and validation-session cleanup on success, failure and
+cancellation. They do not confirm the cause of the cloud 401 reported in issue #68.
+They also verify the 4.3.0 user agent and allowlisted `errorState` diagnostics,
+including malformed/non-JSON error responses and omission of private body fields.
+
 The options tests exercise selection defaults/persistence with HA form boundary
 fixtures; they do not render the frontend. Compatibility tests verify that only
 selected RAC OFF requests change, while ON, fractional temperatures, other RAC
