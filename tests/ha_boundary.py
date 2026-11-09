@@ -51,6 +51,24 @@ def install_when_missing():
     class HomeAssistantError(Exception):
         pass
 
+    class SensorEntity:
+        @property
+        def native_value(self):
+            return getattr(self, "_attr_native_value", None)
+
+        def async_write_ha_state(self):
+            pass
+
+    class SensorDeviceClass(StrEnum):
+        ENERGY = "energy"
+
+    class SensorStateClass(StrEnum):
+        TOTAL = "total"
+        TOTAL_INCREASING = "total_increasing"
+
+    class UnitOfEnergy(StrEnum):
+        KILO_WATT_HOUR = "kWh"
+
     class ConfigFlow:
         def __init_subclass__(cls, **kwargs):
             super().__init_subclass__()
@@ -66,6 +84,12 @@ def install_when_missing():
     module("homeassistant.components")
     module("homeassistant.components.climate", ClimateEntity=ClimateEntity)
     module(
+        "homeassistant.components.sensor",
+        SensorEntity=SensorEntity,
+        SensorDeviceClass=SensorDeviceClass,
+        SensorStateClass=SensorStateClass,
+    )
+    module(
         "homeassistant.components.climate.const",
         ClimateEntityFeature=ClimateEntityFeature,
         HVACMode=HVACMode,
@@ -79,6 +103,7 @@ def install_when_missing():
         "homeassistant.const",
         CONF_EMAIL="email", CONF_PASSWORD="password",
         ATTR_TEMPERATURE="temperature", UnitOfTemperature=UnitOfTemperature,
+        UnitOfEnergy=UnitOfEnergy,
     )
     module("homeassistant.helpers")
     module(

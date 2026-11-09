@@ -4,6 +4,8 @@ import asyncio
 import logging
 from typing import Any
 
+import aiohttp
+
 from homeassistant.components.climate import ClimateEntity
 from homeassistant.components.climate.const import (
     FAN_AUTO,
@@ -248,7 +250,7 @@ class AirCloudClimateEntity(ClimateEntity):
         s = self._mode_settings_for(mode)
         enabled: list[str] = s.get("enabled_fan_speeds") or []
         candidate = str(raw_speed or self._fan_speed or DEFAULT_FAN_SPEED).upper()
-        if not enabled or not s.get("fan_enabled", True):
+        if not enabled:
             return candidate
         if candidate in enabled:
             return candidate
@@ -303,10 +305,14 @@ class AirCloudClimateEntity(ClimateEntity):
         desired_power = (
             "ON" if str(power or self._power or DEFAULT_POWER).upper() == "ON" else "OFF"
         )
-        desired_temp = self._clamp_temp(
-            target_temp if target_temp is not None else self._target_temp,
-            desired_mode,
-        )
+        if target_temp is not None:
+            raw_temp = target_temp
+        elif not self._mode_settings_for(desired_mode).get("temperature_enabled", True):
+            raw_temp = self._default_temp(desired_mode)
+        else:
+            raw_temp = self._target_temp
+
+        desired_temp = self._clamp_temp(raw_temp, desired_mode)
         desired_fan = self._normalize_fan_speed(fan_speed, desired_mode)
         desired_swing = self._normalize_fan_swing(fan_swing)
         desired_humidity = self._command_humidity(desired_mode)
@@ -330,7 +336,12 @@ class AirCloudClimateEntity(ClimateEntity):
                 desired_humidity,
             )
         except Exception as exc:
-            raise HomeAssistantError("AirCloud command failed; previous Home Assistant state was kept") from exc
+            detail = ""
+            if isinstance(exc, aiohttp.ClientResponseError) and exc.message:
+                detail = f": {exc.message}"
+            elif str(exc):
+                detail = f": {exc}"
+            raise HomeAssistantError(f"AirCloud command failed{detail}; previous Home Assistant state was kept") from exc
         finally:
             self._command_in_flight = False
 

@@ -1,0 +1,19 @@
+# Generated ESPHome state and private installation data
+.esphome/
+artifacts/
+backups/
+dist/
+secrets*.yaml
+!secrets.example.yaml
+
+# Unit-specific development and diagnostic configurations are private. The public
+# build uses hitachi-local.yaml for every supported model.
+hitachi-dj*.yaml
+
+# Unit-specific development notes contain private network/device identifiers.
+README.md
+SECOND_UNIT_61EB.md
+
+# Local Python residue from ESPHome/component development
+__pycache__/
+*.pyc

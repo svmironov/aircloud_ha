@@ -22,16 +22,23 @@ class AirCloudConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_user(self, user_input=None):
         if user_input is not None:
-            login = user_input[CONF_EMAIL]
-            password = user_input[CONF_PASSWORD]
+            login = (user_input.get(CONF_EMAIL) or "").strip()
+            password = (user_input.get(CONF_PASSWORD) or "").strip()
+            sanitized_input = {**user_input, CONF_EMAIL: login, CONF_PASSWORD: password}
 
-            if await AirCloudApi(login, password).validate_credentials():
-                return self.async_create_entry(title=login, data=user_input)
+            api = AirCloudApi(login, password)
+            try:
+                valid = await api.validate_credentials()
+            finally:
+                await api.close_session()
+
+            if valid:
+                return self.async_create_entry(title=login, data=sanitized_input)
 
             return self.async_show_form(
                 step_id="user",
                 data_schema=self.user_schema,
-                errors={"base": "invalid_credentials"}
+                errors={"base": "invalid_auth"}
             )
 
         return self.async_show_form(
