@@ -14,7 +14,13 @@ from tests import ha_boundary  # noqa: F401 -- install only absent HA import typ
 from homeassistant.exceptions import HomeAssistantError
 from custom_components.air_cloud import api as api_module
 from custom_components.air_cloud import climate as climate_module
-from custom_components.air_cloud.const import URN_AUTH, URN_REFRESH_TOKEN, URN_CONTROL_STATUS
+from custom_components.air_cloud.const import (
+    DOMAIN,
+    CONF_COMMAND_DELAY,
+    URN_AUTH,
+    URN_REFRESH_TOKEN,
+    URN_CONTROL_STATUS,
+)
 
 
 OLD_PAIR = ("old-access-token", "old-refresh-token")
@@ -280,7 +286,8 @@ class CommandRegressionTests(AirCloudHTTPCase):
         )
         self.entity.async_write_ha_state = Mock()
         self.api.load_climate_data = AsyncMock(return_value=[])
-        self.sleep_patch = patch.object(climate_module.asyncio, "sleep", new=AsyncMock())
+        self.sleep_mock = AsyncMock()
+        self.sleep_patch = patch.object(climate_module.asyncio, "sleep", new=self.sleep_mock)
         self.sleep_patch.start()
         self.command_path = f"{URN_CONTROL_STATUS}/123"
 
@@ -328,6 +335,50 @@ class CommandRegressionTests(AirCloudHTTPCase):
         self.assertEqual(self.entity.target_temperature, 23.5)
         self.assertGreaterEqual(self.entity.async_write_ha_state.call_count, 1)
         self.assertFalse(self.entity._command_in_flight)
+
+    async def test_command_delay_defaults_to_25_seconds(self):
+        self.queue(self.command_path, data={"commandId": "accepted"})
+        await self.entity.async_turn_off()
+        self.sleep_mock.assert_awaited_with(25.0)
+
+    async def test_command_delay_configurable_from_hass_data(self):
+        self.entity._hass.data = {DOMAIN: {CONF_COMMAND_DELAY: 15}}
+        self.queue(self.command_path, data={"commandId": "accepted"})
+        await self.entity.async_turn_off()
+        self.sleep_mock.assert_awaited_with(15.0)
+
+    async def test_async_update_skipped_during_command_delay_window(self):
+        self.queue(self.command_path, data={"commandId": "accepted"})
+        await self.entity.async_turn_off()
+
+        # Follow-up completed, but _command_delay_until is still in the future
+        self.api.load_climate_data.reset_mock()
+        await self.entity.async_update()
+        self.api.load_climate_data.assert_not_called()
+
+    async def test_async_update_executed_after_command_delay_expires(self):
+        self.queue(self.command_path, data={"commandId": "accepted"})
+        await self.entity.async_turn_off()
+
+        # Simulate expiration of command delay
+        self.entity._command_delay_until = 0.0
+        self.api.load_climate_data.reset_mock()
+        self.api.load_climate_data.return_value = [{**DEVICE, "iduTemperature": 26.0}]
+        await self.entity.async_update()
+        self.api.load_climate_data.assert_called_once_with(456)
+        self.assertEqual(self.entity.target_temperature, 26.0)
+
+    async def test_newer_command_supersedes_older_command_refresh(self):
+        self.queue(self.command_path, data={"commandId": "accepted"})
+        self.queue(self.command_path, data={"commandId": "accepted"})
+
+        # Run command 1
+        await self.entity.async_set_temperature(temperature=26.0)
+        self.assertEqual(self.entity.target_temperature, 26.0)
+
+        # Simulate command 2 happening immediately
+        await self.entity.async_set_temperature(temperature=27.0)
+        self.assertEqual(self.entity.target_temperature, 27.0)
 
     async def test_default_rac_payload_and_status_endpoint_remain_unchanged(self):
         self.queue(self.command_path, data={"commandId": "accepted"})

@@ -33,8 +33,10 @@ from .api import (
 )
 from .const import (
     API,
+    CONF_COMMAND_DELAY,
     CONF_TEMP_ADJUST,
     CONF_TEMP_STEP,
+    DEFAULT_COMMAND_DELAY,
     DOMAIN,
     SYS_TYPE_G_RAC,
 )
@@ -137,6 +139,8 @@ class AirCloudClimateEntity(ClimateEntity):
         self._raw_humidity: Any = NO_HUMIDITY_VALUE
         self._sys_type: int | None = None
         self._command_in_flight = False
+        self._command_delay_until: float = 0.0
+        self._command_seq: int = 0
 
         self._apply_snapshot(device)
 
@@ -292,6 +296,15 @@ class AirCloudClimateEntity(ClimateEntity):
                 return default
         return val
 
+    def _get_command_delay(self) -> float:
+        delay = self._hass.data.get(DOMAIN, {}).get(CONF_COMMAND_DELAY)
+        if delay is not None:
+            try:
+                return max(0.0, float(delay))
+            except (ValueError, TypeError):
+                pass
+        return float(DEFAULT_COMMAND_DELAY)
+
     async def _send_command(
         self,
         *,
@@ -324,6 +337,8 @@ class AirCloudClimateEntity(ClimateEntity):
         )
 
         self._command_in_flight = True
+        self._command_seq += 1
+        current_seq = self._command_seq
         try:
             await self._api.execute_command(
                 self._device_id,
@@ -336,6 +351,7 @@ class AirCloudClimateEntity(ClimateEntity):
                 desired_humidity,
             )
         except Exception as exc:
+            self._command_delay_until = 0.0
             detail = ""
             if isinstance(exc, aiohttp.ClientResponseError) and exc.message:
                 detail = f": {exc.message}"
@@ -352,12 +368,24 @@ class AirCloudClimateEntity(ClimateEntity):
         self._fan_swing = desired_swing
         self.async_write_ha_state()
 
-        await asyncio.sleep(2)
+        delay = self._get_command_delay()
+        self._command_delay_until = asyncio.get_running_loop().time() + delay
+
+        if delay > 0:
+            await asyncio.sleep(delay)
+
+        if current_seq != self._command_seq:
+            return
+
         try:
             devices = await self._api.load_climate_data(self._family_id, force=True)
         except Exception as exc:
             _LOGGER.warning("AirCloud: command accepted but state refresh failed: %s", exc)
             return
+
+        if current_seq != self._command_seq:
+            return
+
         for device in devices:
             if device.get("id") == self._device_id:
                 self._apply_snapshot(device)
@@ -509,6 +537,14 @@ class AirCloudClimateEntity(ClimateEntity):
 
     async def async_update(self) -> None:
         if self._command_in_flight:
+            return
+        now = asyncio.get_running_loop().time()
+        if now < self._command_delay_until:
+            _LOGGER.debug(
+                "AirCloud: skipping poll update for device %s during command delay window (%.1fs remaining)",
+                self._device_id,
+                self._command_delay_until - now,
+            )
             return
         devices = await self._api.load_climate_data(self._family_id)
         for device in devices:

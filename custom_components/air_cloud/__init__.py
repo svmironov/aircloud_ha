@@ -19,6 +19,8 @@ from .const import (
     CONF_TEMP_ADJUST,
     CONF_TEMP_STEP,
     CONF_LEGACY_RAC_OFF_DEVICE_IDS,
+    CONF_COMMAND_DELAY,
+    DEFAULT_COMMAND_DELAY,
     DOMAIN,
     PLATFORM_BINARY_SENSOR,
     PLATFORM_BUTTON,
@@ -40,12 +42,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         api.set_legacy_rac_off_device_ids(
             updated_entry.options.get(CONF_LEGACY_RAC_OFF_DEVICE_IDS, [])
         )
+        if DOMAIN in hass.data:
+            hass.data[DOMAIN][CONF_COMMAND_DELAY] = updated_entry.options.get(
+                CONF_COMMAND_DELAY, DEFAULT_COMMAND_DELAY
+            )
 
     entry.async_on_unload(entry.add_update_listener(update_options))
     hass.data[DOMAIN] = {
         API: api,
         CONF_TEMP_ADJUST: {},
         CONF_TEMP_STEP: {},
+        CONF_COMMAND_DELAY: entry.options.get(CONF_COMMAND_DELAY, DEFAULT_COMMAND_DELAY),
     }
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
@@ -59,6 +66,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             API: api,
             CONF_TEMP_ADJUST: {},
             CONF_TEMP_STEP: {},
+            CONF_COMMAND_DELAY: conf.get(CONF_COMMAND_DELAY, DEFAULT_COMMAND_DELAY),
         }
 
     async def _service_exec_command(call: ServiceCall) -> None:

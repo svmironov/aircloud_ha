@@ -5,6 +5,7 @@ import unittest
 from tests import ha_boundary  # noqa: F401
 from custom_components import air_cloud
 from custom_components.air_cloud import config_flow
+from custom_components.air_cloud.const import CONF_COMMAND_DELAY, DEFAULT_COMMAND_DELAY
 
 KEY = 'legacy_rac_off_device_ids'
 
@@ -26,17 +27,22 @@ class CompatibilityOptionsTests(unittest.IsolatedAsyncioTestCase):
     async def test_options_default_to_empty_selection(self):
         flow = self.make_flow({}, Mock(get_rac_device_options=lambda: {'123': 'Test AC'}))
         form = await flow.async_step_init()
-        self.assertEqual(form['data_schema']({}), {KEY: []})
+        self.assertEqual(form['data_schema']({}), {KEY: [], CONF_COMMAND_DELAY: DEFAULT_COMMAND_DELAY})
 
     async def test_existing_offline_selection_is_preserved_in_form(self):
         flow = self.make_flow({KEY: [123]}, Mock(get_rac_device_options=lambda: {}))
         form = await flow.async_step_init()
-        self.assertEqual(form['data_schema']({}), {KEY: ['123']})
+        self.assertEqual(form['data_schema']({}), {KEY: ['123'], CONF_COMMAND_DELAY: DEFAULT_COMMAND_DELAY})
 
     async def test_saving_selection_keeps_other_options(self):
         flow = self.make_flow({'existing_setting': True})
         result = await flow.async_step_init({KEY: ['123']})
         self.assertEqual(result['data'], {'existing_setting': True, KEY: [123]})
+
+    async def test_saving_command_delay_option(self):
+        flow = self.make_flow({KEY: [123], CONF_COMMAND_DELAY: 15})
+        result = await flow.async_step_init({KEY: [123], CONF_COMMAND_DELAY: 30})
+        self.assertEqual(result['data'], {KEY: [123], CONF_COMMAND_DELAY: 30})
 
     async def test_empty_selection_disables_compatibility(self):
         flow = self.make_flow({KEY: [123]})

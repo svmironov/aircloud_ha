@@ -5,7 +5,8 @@
         "title": "Compatibilidade ao desligar (experimental)",
         "description": "Selecione somente aparelhos que não desligam com a configuração padrão. Deixe vazio se seus aparelhos funcionam corretamente. Esta opção foi baseada em um caso relatado no Brasil; ela não é necessária para todos os aparelhos brasileiros. Os demais comandos e aparelhos não selecionados mantêm o comportamento padrão.",
         "data": {
-          "legacy_rac_off_device_ids": "Aparelhos que precisam de compatibilidade ao desligar"
+          "legacy_rac_off_device_ids": "Aparelhos que precisam de compatibilidade ao desligar",
+          "command_delay": "Tempo de espera antes de atualizar o estado da nuvem após um comando (segundos)"
         }
       }
     }
