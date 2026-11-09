@@ -5,7 +5,10 @@ from unittest.mock import AsyncMock
 
 from tests.test_regressions import AirCloudHTTPCase, NEW_RESPONSE
 from custom_components.air_cloud import sensor as sensor_module
-from custom_components.air_cloud.api import get_current_month_date_range
+from custom_components.air_cloud.api import (
+    get_current_month_date_range,
+    get_current_year_date_range,
+)
 from custom_components.air_cloud.const import (
     DOMAIN,
     API,
@@ -30,6 +33,15 @@ class EnergyConsumptionTests(AirCloudHTTPCase):
         self.assertEqual(end_date, expected_end)
         self.assertEqual(len(start_date.split("-")), 3)
         self.assertEqual(len(end_date.split("-")), 3)
+
+    def test_current_year_date_range(self):
+        start_date, end_date = get_current_year_date_range()
+        now = datetime.now()
+        expected_start = f"{now.year:04d}-01-01"
+        expected_end = f"{now.year:04d}-12-31"
+
+        self.assertEqual(start_date, expected_start)
+        self.assertEqual(end_date, expected_end)
 
     async def test_load_energy_consumption_summary_sends_current_month(self):
         self.set_token_pair(stale=False)
@@ -124,6 +136,7 @@ class EnergyConsumptionTests(AirCloudHTTPCase):
     async def test_sensor_build_entities_from_summary(self):
         self.set_token_pair(stale=False)
         self.queue(URN_WHO, data=[{"familyId": 155725}])
+        # Monthly summary response
         self.queue(
             URN_ENERGY_CONSUMPTION_SUMMARY,
             data={
@@ -138,27 +151,63 @@ class EnergyConsumptionTests(AirCloudHTTPCase):
                 ],
             },
         )
+        # Yearly summary response
+        self.queue(
+            URN_ENERGY_CONSUMPTION_SUMMARY,
+            data={
+                "allRacsData": {"currency": "USD"},
+                "individualRacsData": [
+                    {
+                        "vendorThingId": "test-rac-1",
+                        "racName": "Etage",
+                        "energyConsumed": 350.0,
+                        "cost": 55.0,
+                    }
+                ],
+            },
+        )
 
         hass = type("Hass", (), {"data": {DOMAIN: {API: self.api}}})()
         entities = await sensor_module._build_entities(hass)
 
-        self.assertEqual(len(entities), 1)
-        sensor = entities[0]
-        self.assertEqual(sensor._vendor_id, "test-rac-1")
-        self.assertEqual(sensor._attr_name, "Etage Energy Consumption")
-        self.assertEqual(sensor._attr_unique_id, "test-rac-1_energy")
-        self.assertEqual(sensor.native_value, 42.5)
-        self.assertEqual(sensor.device_class, SensorDeviceClass.ENERGY)
-        self.assertEqual(sensor.state_class, SensorStateClass.TOTAL_INCREASING)
-        self.assertEqual(sensor.native_unit_of_measurement, UnitOfEnergy.KILO_WATT_HOUR)
-        self.assertEqual(sensor.device_info["identifiers"], {(DOMAIN, "test-rac-1")})
-        self.assertEqual(sensor.extra_state_attributes["family_id"], 155725)
-        self.assertEqual(sensor.extra_state_attributes["cost"], 6.8)
-        self.assertEqual(sensor.extra_state_attributes["currency"], "USD")
+        self.assertEqual(len(entities), 2)
+        # Monthly sensor
+        monthly_sensor = entities[0]
+        self.assertEqual(monthly_sensor._vendor_id, "test-rac-1")
+        self.assertEqual(monthly_sensor._attr_name, "Etage Energy Consumption")
+        self.assertEqual(monthly_sensor._attr_unique_id, "test-rac-1_energy")
+        self.assertEqual(monthly_sensor.native_value, 42.5)
+        self.assertEqual(monthly_sensor.device_class, SensorDeviceClass.ENERGY)
+        self.assertEqual(monthly_sensor.state_class, SensorStateClass.TOTAL_INCREASING)
+        self.assertEqual(monthly_sensor.native_unit_of_measurement, UnitOfEnergy.KILO_WATT_HOUR)
+        self.assertEqual(monthly_sensor.device_info["identifiers"], {(DOMAIN, "test-rac-1")})
+        self.assertEqual(monthly_sensor.extra_state_attributes["family_id"], 155725)
+        self.assertEqual(monthly_sensor.extra_state_attributes["period"], "monthly")
+        self.assertEqual(monthly_sensor.extra_state_attributes["cost"], 6.8)
+        self.assertEqual(monthly_sensor.extra_state_attributes["currency"], "USD")
+
+        # Yearly sensor
+        yearly_sensor = entities[1]
+        self.assertEqual(yearly_sensor._vendor_id, "test-rac-1")
+        self.assertEqual(yearly_sensor._attr_name, "Etage Yearly Energy Consumption")
+        self.assertEqual(yearly_sensor._attr_unique_id, "test-rac-1_yearly_energy")
+        self.assertEqual(yearly_sensor.native_value, 350.0)
+        self.assertEqual(yearly_sensor.device_class, SensorDeviceClass.ENERGY)
+        self.assertEqual(yearly_sensor.state_class, SensorStateClass.TOTAL_INCREASING)
+        self.assertEqual(yearly_sensor.native_unit_of_measurement, UnitOfEnergy.KILO_WATT_HOUR)
+        self.assertEqual(yearly_sensor.device_info["identifiers"], {(DOMAIN, "test-rac-1")})
+        self.assertEqual(yearly_sensor.extra_state_attributes["family_id"], 155725)
+        self.assertEqual(yearly_sensor.extra_state_attributes["period"], "yearly")
+        self.assertEqual(yearly_sensor.extra_state_attributes["cost"], 55.0)
+        self.assertEqual(yearly_sensor.extra_state_attributes["currency"], "USD")
 
     async def test_sensor_build_entities_null_safety(self):
         self.set_token_pair(stale=False)
         self.queue(URN_WHO, data=[{"familyId": 155725}])
+        self.queue(
+            URN_ENERGY_CONSUMPTION_SUMMARY,
+            data={"allRacsData": None, "individualRacsData": None},
+        )
         self.queue(
             URN_ENERGY_CONSUMPTION_SUMMARY,
             data={"allRacsData": None, "individualRacsData": None},
@@ -173,6 +222,7 @@ class EnergyConsumptionTests(AirCloudHTTPCase):
     async def test_sensor_fallback_when_summary_empty(self):
         self.set_token_pair(stale=False)
         self.queue(URN_WHO, data=[{"familyId": 155725}])
+        self.queue(URN_ENERGY_CONSUMPTION_SUMMARY, data={"individualRacsData": []})
         self.queue(URN_ENERGY_CONSUMPTION_SUMMARY, data={"individualRacsData": []})
         self.queue(
             URN_ENERGY_ALL_RACS,
@@ -198,11 +248,18 @@ class EnergyConsumptionTests(AirCloudHTTPCase):
         hass = type("Hass", (), {"data": {DOMAIN: {API: self.api}}})()
         entities = await sensor_module._build_entities(hass)
 
-        self.assertEqual(len(entities), 1)
-        sensor = entities[0]
-        self.assertEqual(sensor._vendor_id, "test-rac-fallback")
-        self.assertEqual(sensor._attr_name, "Salon Energy Consumption")
-        self.assertIsNone(sensor.native_value)
+        self.assertEqual(len(entities), 2)
+        m_sensor = entities[0]
+        self.assertEqual(m_sensor._vendor_id, "test-rac-fallback")
+        self.assertEqual(m_sensor._attr_name, "Salon Energy Consumption")
+        self.assertEqual(m_sensor._attr_unique_id, "test-rac-fallback_energy")
+        self.assertIsNone(m_sensor.native_value)
+
+        y_sensor = entities[1]
+        self.assertEqual(y_sensor._vendor_id, "test-rac-fallback")
+        self.assertEqual(y_sensor._attr_name, "Salon Yearly Energy Consumption")
+        self.assertEqual(y_sensor._attr_unique_id, "test-rac-fallback_yearly_energy")
+        self.assertIsNone(y_sensor.native_value)
 
     async def test_sensor_async_update(self):
         self.set_token_pair(stale=False)
@@ -235,3 +292,44 @@ class EnergyConsumptionTests(AirCloudHTTPCase):
         self.assertEqual(sensor.native_value, 25.5)
         self.assertEqual(sensor.extra_state_attributes["cost"], 3.8)
         self.assertEqual(sensor.extra_state_attributes["currency"], "EUR")
+
+    async def test_sensor_async_update_yearly(self):
+        self.set_token_pair(stale=False)
+        rac_data = {
+            "vendorThingId": "test-rac-1",
+            "racName": "Living Room",
+            "energyConsumed": 100.0,
+            "cost": 15.0,
+        }
+        sensor = sensor_module.AirCloudEnergySensor(
+            self.api, rac_data, 155725, period="yearly"
+        )
+        self.assertEqual(sensor.native_value, 100.0)
+        self.assertEqual(sensor._attr_unique_id, "test-rac-1_yearly_energy")
+        self.assertEqual(sensor._attr_name, "Living Room Yearly Energy Consumption")
+
+        self.queue(
+            URN_ENERGY_CONSUMPTION_SUMMARY,
+            data={
+                "allRacsData": {"currency": "EUR"},
+                "individualRacsData": [
+                    {
+                        "vendorThingId": "test-rac-1",
+                        "racName": "Living Room",
+                        "energyConsumed": 250.0,
+                        "cost": 35.0,
+                    }
+                ],
+            },
+        )
+
+        await sensor.async_update()
+        self.assertEqual(sensor.native_value, 250.0)
+        self.assertEqual(sensor.extra_state_attributes["cost"], 35.0)
+        self.assertEqual(sensor.extra_state_attributes["period"], "yearly")
+
+        requests = self.requests_for(URN_ENERGY_CONSUMPTION_SUMMARY)
+        self.assertEqual(len(requests), 1)
+        start_year, end_year = get_current_year_date_range()
+        self.assertEqual(requests[0]["json"]["from"], start_year)
+        self.assertEqual(requests[0]["json"]["to"], end_year)

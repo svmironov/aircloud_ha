@@ -71,6 +71,11 @@ def get_current_month_date_range() -> tuple[str, str]:
     return start_date, end_date
 
 
+def get_current_year_date_range() -> tuple[str, str]:
+    now = datetime.now()
+    return f"{now.year:04d}-01-01", f"{now.year:04d}-12-31"
+
+
 class AirCloudAuthenticationError(RuntimeError):
     """An authentication response did not contain a usable token pair."""
 

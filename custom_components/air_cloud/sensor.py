@@ -10,6 +10,7 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.const import UnitOfEnergy
+from .api import get_current_month_date_range, get_current_year_date_range
 from .const import API, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
@@ -23,14 +24,46 @@ async def _build_entities(hass) -> list[AirCloudEnergySensor]:
     seen_vendor_ids: set[str] = set()
     family_ids = await api.load_family_ids()
 
+    month_from, month_to = get_current_month_date_range()
+    year_from, year_to = get_current_year_date_range()
+
     for family_id in family_ids:
-        data = await api.load_energy_consumption_summary(family_id)
-        racs_data = data.get("individualRacsData") or []
-        for rac_data in racs_data:
-            vendor_id = rac_data.get("vendorThingId")
+        monthly_data = await api.load_energy_consumption_summary(
+            family_id, from_date=month_from, to_date=month_to
+        )
+        yearly_data = await api.load_energy_consumption_summary(
+            family_id, from_date=year_from, to_date=year_to
+        )
+
+        monthly_racs = {
+            rac.get("vendorThingId"): rac
+            for rac in (monthly_data.get("individualRacsData") or [])
+            if rac.get("vendorThingId")
+        }
+        yearly_racs = {
+            rac.get("vendorThingId"): rac
+            for rac in (yearly_data.get("individualRacsData") or [])
+            if rac.get("vendorThingId")
+        }
+
+        all_vendor_ids = set(monthly_racs.keys()) | set(yearly_racs.keys())
+        for vendor_id in sorted(all_vendor_ids):
             if vendor_id and vendor_id not in seen_vendor_ids:
                 seen_vendor_ids.add(vendor_id)
-                entities.append(AirCloudEnergySensor(api, rac_data, family_id, data))
+                m_info = monthly_racs.get(vendor_id) or {
+                    "vendorThingId": vendor_id,
+                    "racName": yearly_racs.get(vendor_id, {}).get("racName", "AirCloud"),
+                }
+                y_info = yearly_racs.get(vendor_id) or {
+                    "vendorThingId": vendor_id,
+                    "racName": monthly_racs.get(vendor_id, {}).get("racName", "AirCloud"),
+                }
+                entities.append(
+                    AirCloudEnergySensor(api, m_info, family_id, monthly_data, period="monthly")
+                )
+                entities.append(
+                    AirCloudEnergySensor(api, y_info, family_id, yearly_data, period="yearly")
+                )
 
         # Fallback if summary had no individual RACs data at setup time:
         # Check all/racs to see if user has selected RACs for energy monitoring
@@ -56,7 +89,14 @@ async def _build_entities(hass) -> list[AirCloudEnergySensor]:
                                     "racId": device.get("id"),
                                 }
                                 entities.append(
-                                    AirCloudEnergySensor(api, fallback_rac_data, family_id, data)
+                                    AirCloudEnergySensor(
+                                        api, fallback_rac_data, family_id, monthly_data, period="monthly"
+                                    )
+                                )
+                                entities.append(
+                                    AirCloudEnergySensor(
+                                        api, fallback_rac_data, family_id, yearly_data, period="yearly"
+                                    )
                                 )
             except Exception as exc:
                 _LOGGER.debug(
@@ -87,9 +127,11 @@ class AirCloudEnergySensor(SensorEntity):
         rac_data: dict[str, Any],
         family_id: int,
         summary_data: dict[str, Any] | None = None,
+        period: str = "monthly",
     ) -> None:
         self._api = api
         self._family_id = family_id
+        self._period = period
         self._vendor_id: str = rac_data.get("vendorThingId", "")
         self._rac_name: str = rac_data.get("racName", "AirCloud")
         self._attr_native_value: float | None = None
@@ -105,8 +147,12 @@ class AirCloudEnergySensor(SensorEntity):
         self._period_from: str | None = (summary_data or {}).get("from")
         self._period_to: str | None = (summary_data or {}).get("to")
 
-        self._attr_unique_id = f"{self._vendor_id}_energy"
-        self._attr_name = f"{self._rac_name} Energy Consumption"
+        if self._period == "yearly":
+            self._attr_unique_id = f"{self._vendor_id}_yearly_energy"
+            self._attr_name = f"{self._rac_name} Yearly Energy Consumption"
+        else:
+            self._attr_unique_id = f"{self._vendor_id}_energy"
+            self._attr_name = f"{self._rac_name} Energy Consumption"
 
     @property
     def native_value(self) -> float | None:
@@ -137,6 +183,7 @@ class AirCloudEnergySensor(SensorEntity):
     def extra_state_attributes(self) -> dict[str, Any]:
         attrs: dict[str, Any] = {
             "family_id": self._family_id,
+            "period": self._period,
         }
         if self._cost is not None:
             attrs["cost"] = self._cost
@@ -149,7 +196,14 @@ class AirCloudEnergySensor(SensorEntity):
         return attrs
 
     async def async_update(self) -> None:
-        data = await self._api.load_energy_consumption_summary(self._family_id)
+        if self._period == "yearly":
+            from_date, to_date = get_current_year_date_range()
+        else:
+            from_date, to_date = get_current_month_date_range()
+
+        data = await self._api.load_energy_consumption_summary(
+            self._family_id, from_date=from_date, to_date=to_date
+        )
         racs_data = data.get("individualRacsData") or []
         for rac in racs_data:
             if rac.get("vendorThingId") == self._vendor_id:
