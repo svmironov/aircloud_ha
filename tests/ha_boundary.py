@@ -118,7 +118,7 @@ def install_when_missing():
         multi_select=lambda options: vol.All(list, [vol.In(options)]),
     )
     module("homeassistant.config_entries", ConfigEntry=type("ConfigEntry", (), {}),
-           ConfigFlow=ConfigFlow, OptionsFlow=OptionsFlow, CONN_CLASS_CLOUD_POLL="cloud_poll")
+           ConfigFlow=ConfigFlow, OptionsFlow=OptionsFlow)
     module(
         "homeassistant.core", HomeAssistant=type("HomeAssistant", (), {}),
         ServiceCall=type("ServiceCall", (), {}),
