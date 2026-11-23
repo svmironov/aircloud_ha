@@ -436,16 +436,23 @@ class AirCloudClimateEntity(ClimateEntity):
         return features
 
     @property
-    def temperature_unit(self) -> str:
+    def native_temperature_unit(self) -> str:
         return UnitOfTemperature.CELSIUS
 
     @property
-    def current_temperature(self) -> float | None:
+    def native_current_temperature(self) -> float | None:
         return self._room_temp
 
     @property
-    def target_temperature(self) -> float:
+    def native_target_temperature(self) -> float:
         return self._target_temp
+
+    # Home Assistant before 2026.11 reads the old names. Avoid overriding
+    # deprecated properties on versions that support the native API.
+    if not hasattr(ClimateEntity, "native_temperature_unit"):
+        temperature_unit = native_temperature_unit
+        current_temperature = native_current_temperature
+        target_temperature = native_target_temperature
 
     @property
     def target_temperature_step(self) -> float:

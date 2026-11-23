@@ -314,7 +314,7 @@ class CommandRegressionTests(AirCloudHTTPCase):
         self.queue(self.command_path, data={"commandId": "accepted"})
         await self.entity.async_turn_off()
         self.assertEqual(self.entity._power, "OFF")
-        self.assertEqual(self.entity.target_temperature, 23.5)
+        self.assertEqual(self.entity.native_target_temperature, 23.5)
         self.assertEqual(self.entity.async_write_ha_state.call_count, 2)
         self.api.load_climate_data.assert_awaited_once_with(456, force=True)
         self.assertFalse(self.entity._command_in_flight)
@@ -324,7 +324,7 @@ class CommandRegressionTests(AirCloudHTTPCase):
         self.api.load_climate_data.return_value = [{**DEVICE, "iduTemperature": 22.0}]
         await self.entity.async_turn_off()
         self.assertEqual(self.entity._power, "ON")
-        self.assertEqual(self.entity.target_temperature, 22.0)
+        self.assertEqual(self.entity.native_target_temperature, 22.0)
         self.assertEqual(self.entity.async_write_ha_state.call_count, 2)
 
     async def test_followup_read_failure_does_not_turn_accepted_command_into_failure(self):
@@ -332,7 +332,7 @@ class CommandRegressionTests(AirCloudHTTPCase):
         self.api.load_climate_data.side_effect = aiohttp.ClientError("snapshot unavailable")
         await self.entity.async_turn_off()
         self.assertEqual(self.entity._power, "OFF")
-        self.assertEqual(self.entity.target_temperature, 23.5)
+        self.assertEqual(self.entity.native_target_temperature, 23.5)
         self.assertGreaterEqual(self.entity.async_write_ha_state.call_count, 1)
         self.assertFalse(self.entity._command_in_flight)
 
@@ -366,7 +366,7 @@ class CommandRegressionTests(AirCloudHTTPCase):
         self.api.load_climate_data.return_value = [{**DEVICE, "iduTemperature": 26.0}]
         await self.entity.async_update()
         self.api.load_climate_data.assert_called_once_with(456)
-        self.assertEqual(self.entity.target_temperature, 26.0)
+        self.assertEqual(self.entity.native_target_temperature, 26.0)
 
     async def test_newer_command_supersedes_older_command_refresh(self):
         self.queue(self.command_path, data={"commandId": "accepted"})
@@ -374,11 +374,11 @@ class CommandRegressionTests(AirCloudHTTPCase):
 
         # Run command 1
         await self.entity.async_set_temperature(temperature=26.0)
-        self.assertEqual(self.entity.target_temperature, 26.0)
+        self.assertEqual(self.entity.native_target_temperature, 26.0)
 
         # Simulate command 2 happening immediately
         await self.entity.async_set_temperature(temperature=27.0)
-        self.assertEqual(self.entity.target_temperature, 27.0)
+        self.assertEqual(self.entity.native_target_temperature, 27.0)
 
     async def test_default_rac_payload_and_status_endpoint_remain_unchanged(self):
         self.queue(self.command_path, data={"commandId": "accepted"})

@@ -42,6 +42,10 @@ def install_when_missing():
         TURN_ON = 256
 
     class ClimateEntity:
+        native_temperature_unit = None
+        native_current_temperature = None
+        native_target_temperature = None
+
         def async_write_ha_state(self):
             pass
 
