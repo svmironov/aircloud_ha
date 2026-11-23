@@ -108,12 +108,6 @@ async def _build_entities(hass) -> list[AirCloudEnergySensor]:
     return entities
 
 
-async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
-    entities = await _build_entities(hass)
-    if entities:
-        async_add_entities(entities)
-
-
 async def async_setup_entry(hass, config_entry, async_add_entities):
     entities = await _build_entities(hass)
     if entities:

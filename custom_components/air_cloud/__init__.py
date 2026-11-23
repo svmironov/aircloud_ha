@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.helpers import config_validation as cv
 
 from .api import AirCloudApi
 from .const import (
@@ -31,6 +32,8 @@ from .const import (
     SERVICE_EXEC_COMMAND_DATA_SCHEMA,
 )
 
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+
 PLATFORMS = [PLATFORM_BINARY_SENSOR, PLATFORM_BUTTON, PLATFORM_CLIMATE, PLATFORM_NUMBER, PLATFORM_SENSOR]
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -58,16 +61,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
-    conf = config.get(DOMAIN)
-    if conf:
-        api = AirCloudApi(conf.get(CONF_EMAIL, ""), conf.get(CONF_PASSWORD, ""))
-        api.set_legacy_rac_off_device_ids(conf.get(CONF_LEGACY_RAC_OFF_DEVICE_IDS, []))
-        hass.data[DOMAIN] = {
-            API: api,
-            CONF_TEMP_ADJUST: {},
-            CONF_TEMP_STEP: {},
-            CONF_COMMAND_DELAY: conf.get(CONF_COMMAND_DELAY, DEFAULT_COMMAND_DELAY),
-        }
+    """Register services; accounts and platforms are set up from config entries."""
 
     async def _service_exec_command(call: ServiceCall) -> None:
         await hass.data[DOMAIN][API].execute_command(

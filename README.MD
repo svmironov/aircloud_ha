@@ -22,19 +22,31 @@ https://github.com/svmironov/aircloud_ha to HACS as a custom repository.
 
 ## Configuration
 
-You can add integration in the UI or manual in configuration.yml
+Set up AirCloud through the Home Assistant interface:
 
-```yml
-    air_cloud:
-        email: "login" # supported only email authorization
-        password: "pass"
+1. Open **Settings → Devices & services → Add integration**.
+2. Search for **AirCloud**.
+3. Enter the email address and password for your airCloud account.
 
-    climate:
-       - platform: air_cloud
-```
+Only email-based accounts are supported. YAML integration setup is no longer
+supported.
 
 All devices are loaded from airCloud. A Home Assistant entity is created for every
 device using its airCloud name.
+
+### Migrating an existing YAML configuration
+
+1. Remove the top-level `air_cloud:` block from `configuration.yaml` or any included
+   files. Also remove the `platform: air_cloud` entries under `climate:` and
+   `sensor:`, keeping entries for other integrations.
+2. Restart Home Assistant.
+3. Add AirCloud through **Settings → Devices & services** as described above. If
+   AirCloud is already configured there, keep that existing integration entry.
+4. Open AirCloud's **Configure** dialog and restore any command delay or
+   **OFF compatibility** settings previously set in YAML.
+
+This migration is manual. Dashboard and automation YAML that uses AirCloud
+entities or the `air_cloud.exec_command` action remains supported.
 
 ## Sample lovelace object
 
@@ -131,15 +143,6 @@ ON requests, fractional setpoints while operating, unselected devices, GPAC and
 Yutampo payloads are unchanged. Non-vertical swing values and AUTO-mode OFF still
 need verification with the affected devices; do not infer universal support from
 the historical VERTICAL/COOLING example.
-
-For an existing YAML-configured integration, the equivalent optional list is:
-
-```yaml
-air_cloud:
-  email: "your account"
-  password: !secret aircloud_password
-  legacy_rac_off_device_ids: [12345]  # use your affected RAC device IDs
-```
 
 Do not enable this option merely because the installation is located in Brazil.
 Record the model, mode, final payload and sanitized response when testing. Never

@@ -116,6 +116,9 @@ def install_when_missing():
         positive_float=vol.All(vol.Coerce(float), vol.Range(min=0)),
         string=str,
         multi_select=lambda options: vol.All(list, [vol.In(options)]),
+        # The real helper also logs/creates repairs; this boundary does not
+        # simulate Home Assistant's repair registry.
+        config_entry_only_config_schema=lambda domain: lambda config: config,
     )
     module("homeassistant.config_entries", ConfigEntry=type("ConfigEntry", (), {}),
            ConfigFlow=ConfigFlow, OptionsFlow=OptionsFlow)

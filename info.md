@@ -16,14 +16,19 @@ AirCloud API have low performance. Execution of commands and updating the UI occ
 
 ## Configuration
 
-    air_cloud:
-        email: "login" #supported only email authorization
-        password: "pass"
+Open **Settings → Devices & services → Add integration**, search for **AirCloud**,
+and enter your airCloud account's email address and password. YAML integration
+setup is no longer supported.
 
-    climate:
-       - platform: air_cloud
+All devices are loaded from airCloud. A Home Assistant entity is created for every
+device using its airCloud name.
 
-All devices be loaded from AirCloud. For every device be created HA entity with name from AirCloud
+If you previously configured AirCloud in YAML, remove the top-level `air_cloud:`
+block and the `platform: air_cloud` entries under `climate:` and `sensor:` from
+your configuration files, then restart Home Assistant and add the integration
+through the interface. Keep an existing UI integration entry if you already have
+one. Restore any command delay or OFF compatibility settings in its **Configure**
+dialog. Dashboard and automation YAML remains supported.
 
 ## Sample lovelace object
 
